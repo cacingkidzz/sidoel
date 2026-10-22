@@ -12,6 +12,19 @@ function hashPassword($password)
     return password_hash($password, PASSWORD_BCRYPT);
 }
 
+// Validasi id tahun ajaran dari input; 0 bila tidak valid
+function validIdTa($koneksi, $id)
+{
+    $id = (int)$id;
+    if ($id <= 0) return 0;
+    $stmt = $koneksi->prepare("SELECT id_tahun_ajaran FROM dt_tahun_ajar WHERE id_tahun_ajaran = ? LIMIT 1");
+    $stmt->bind_param("i", $id);
+    $stmt->execute();
+    $ada = $stmt->get_result()->num_rows > 0;
+    $stmt->close();
+    return $ada ? $id : 0;
+}
+
 // Ambil ID tahun ajaran aktif dari sesi
 function getIdTahunAjaranAktif($koneksi)
 {
@@ -113,7 +126,13 @@ function tarikCalonSiswa($koneksi, $id_calon, $id_ta_aktif)
 // ==========================================================
 if (isset($_POST['tarik_calon'])) {
     $id_calon = (int)($_POST['id_calon'] ?? 0);
-    $id_ta_aktif = getIdTahunAjaranAktif($koneksi);
+    $id_ta_aktif = validIdTa($koneksi, $_POST['id_ta'] ?? 0);
+    if ($id_ta_aktif <= 0) {
+        $id_ta_aktif = getIdTahunAjaranAktif($koneksi);
+    }
+    if ($id_ta_aktif > 0) {
+        $back_url .= "&ta=" . $id_ta_aktif;
+    }
 
     if ($id_ta_aktif <= 0) {
         echo "<script>alert('Tahun ajaran aktif tidak ditemukan.');window.location='$back_url';</script>";
@@ -147,7 +166,13 @@ if (isset($_POST['tarik_calon'])) {
 // 2. TARIK SEMUA CALON SISWA DITERIMA YANG BELUM DITARIK
 // ==========================================================
 if (isset($_POST['tarik_semua'])) {
-    $id_ta_aktif = getIdTahunAjaranAktif($koneksi);
+    $id_ta_aktif = validIdTa($koneksi, $_POST['id_ta'] ?? 0);
+    if ($id_ta_aktif <= 0) {
+        $id_ta_aktif = getIdTahunAjaranAktif($koneksi);
+    }
+    if ($id_ta_aktif > 0) {
+        $back_url .= "&ta=" . $id_ta_aktif;
+    }
 
     if ($id_ta_aktif <= 0) {
         echo "<script>alert('Tahun ajaran aktif tidak ditemukan.');window.location='$back_url';</script>";
@@ -158,7 +183,7 @@ if (isset($_POST['tarik_semua'])) {
         "SELECT cs.id_calon
          FROM ppdb_calon_siswa cs
          LEFT JOIN dt_siswa s ON s.nisn = cs.nisn AND s.id_tahun_ajaran = $id_ta_aktif
-         WHERE cs.status = 4 AND s.id_siswa IS NULL"
+         WHERE cs.status = 4 AND cs.tahun_ajaran = $id_ta_aktif AND s.id_siswa IS NULL"
     );
 
     $ids = [];

@@ -76,7 +76,7 @@ $isKbmReferensiActive = in_array($activeMenu, $kbmReferensiMenus);
 $kbmPembelajaranMenus = ['jadwal', 'jurnal_kelas', 'kalender_akademik'];
 $isKbmPembelajaranActive = in_array($activeMenu, $kbmPembelajaranMenus);
 
-$kbmRekapMenus = ['rekap_absensi', 'rekap_jurnal'];
+$kbmRekapMenus = ['dashboard_wali_kelas', 'rekap_absensi', 'rekap_jurnal'];
 $isKbmRekapActive = in_array($activeMenu, $kbmRekapMenus);
 
 $kbmMenus = array_merge($kbmReferensiMenus, $kbmPembelajaranMenus, $kbmRekapMenus);
@@ -697,6 +697,15 @@ $isAdministrasiActive = in_array($activeMenu, $administrasiMenus);
                                 </p>
                             </a>
                             <ul class="nav nav-treeview">
+                                <?php if (boleh_menu($level_user, 'dashboard_wali_kelas')): ?>
+                                <li class="nav-item">
+                                    <a href="?menu=dashboard_wali_kelas"
+                                        class="nav-link <?php echo ($activeMenu == 'dashboard_wali_kelas') ? 'active' : ''; ?>">
+                                        <i class="nav-icon bi bi-speedometer2"></i>
+                                        <p>Dashboard Wali Kelas</p>
+                                    </a>
+                                </li>
+                                <?php endif; ?>
                                 <?php if (boleh_menu($level_user, 'rekap_absensi')): ?>
                                 <li class="nav-item">
                                     <a href="?menu=rekap_absensi"

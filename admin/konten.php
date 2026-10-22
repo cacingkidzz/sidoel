@@ -102,6 +102,9 @@
                 case 'jadwal': // (dt_jadwal, dt_jam_pelajaran) - Jadwal pelajaran per tingkat
                     include('konten/jadwal.php');
                     break;
+                case 'dashboard_wali_kelas': // Monitoring absensi & jurnal kelas oleh wali kelas
+                    include('konten/dashboard_wali_kelas.php');
+                    break;
                 case 'rekap_absensi': // (dt_absensi, dt_jurnal) - Rekap absensi kelas + cetak (KBM-3)
                     include('konten/rekap_absensi.php');
                     break;

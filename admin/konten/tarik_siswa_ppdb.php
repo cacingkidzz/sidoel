@@ -3,48 +3,64 @@
 </div>
 <?php
 // ==========================================================
-// 1. TAHUN AJARAN AKTIF DARI SESI
+// 1. Tahun ajaran aktif (dari session)
 // ==========================================================
-$nama_ta_sesi = $_SESSION['tahun_ajaran_aktif'] ?? '';
+$ta_nama_sesi = $_SESSION['tahun_ajaran_aktif'] ?? '';
+$id_ta_sesi = 0;
+if ($ta_nama_sesi !== '') {
+    $q_sesi = $koneksi->prepare("SELECT id_tahun_ajaran FROM dt_tahun_ajar WHERE tahun_ajaran = ? LIMIT 1");
+    $q_sesi->bind_param("s", $ta_nama_sesi);
+    $q_sesi->execute();
+    $r_sesi = $q_sesi->get_result()->fetch_assoc();
+    $q_sesi->close();
+    if ($r_sesi) $id_ta_sesi = (int)$r_sesi['id_tahun_ajaran'];
+}
+
+// TA yang dipilih filter (default = aktif dari session)
+$id_ta_filter = (int)($_GET['ta'] ?? $id_ta_sesi);
 $id_ta_aktif = 0;
 $nama_ta_aktif = '-';
-
-if (isset($koneksi) && !$koneksi->connect_error && $nama_ta_sesi !== '') {
-    $q_ta = $koneksi->prepare("SELECT id_tahun_ajaran, tahun_ajaran FROM dt_tahun_ajar WHERE tahun_ajaran = ? LIMIT 1");
-    $q_ta->bind_param("s", $nama_ta_sesi);
+if ($id_ta_filter > 0) {
+    $q_ta = $koneksi->prepare("SELECT id_tahun_ajaran, tahun_ajaran FROM dt_tahun_ajar WHERE id_tahun_ajaran = ? LIMIT 1");
+    $q_ta->bind_param("i", $id_ta_filter);
     $q_ta->execute();
-    $res_ta = $q_ta->get_result();
-    if ($res_ta->num_rows > 0) {
-        $dta = $res_ta->fetch_assoc();
-        $id_ta_aktif = (int)$dta['id_tahun_ajaran'];
-        $nama_ta_aktif = htmlspecialchars($dta['tahun_ajaran']);
-    }
+    $row_ta = $q_ta->get_result()->fetch_assoc();
     $q_ta->close();
-}
-if ($id_ta_aktif <= 0) {
-    $res_ta = $koneksi->query("SELECT id_tahun_ajaran, tahun_ajaran FROM dt_tahun_ajar WHERE status = 'aktif' LIMIT 1");
-    if ($res_ta && $res_ta->num_rows > 0) {
-        $dta = $res_ta->fetch_assoc();
-        $id_ta_aktif = (int)$dta['id_tahun_ajaran'];
-        $nama_ta_aktif = htmlspecialchars($dta['tahun_ajaran']);
+    if ($row_ta) {
+        $id_ta_aktif = (int)$row_ta['id_tahun_ajaran'];
+        $nama_ta_aktif = htmlspecialchars($row_ta['tahun_ajaran']);
     }
 }
 
 // ==========================================================
-// 2. STATISTIK CALON SISWA DITERIMA (STATUS 4)
+// Daftar semua tahun ajaran (untuk filter dropdown)
+// ==========================================================
+$ta_list = [];
+$q_ta_all = $koneksi->query("SELECT id_tahun_ajaran, tahun_ajaran, status FROM dt_tahun_ajar ORDER BY tahun_ajaran DESC");
+if ($q_ta_all) {
+    while ($rt = $q_ta_all->fetch_assoc()) {
+        $ta_list[] = $rt;
+    }
+}
+
+// ==========================================================
+// 2. STATISTIK CALON SISWA DITERIMA (STATUS 4) per TA terpilih
 // ==========================================================
 $total_diterima = $sudah_ditarik = $belum_ditarik = 0;
 
 if ($id_ta_aktif > 0) {
-    $q_stat = $koneksi->query(
+    $q_stat = $koneksi->prepare(
         "SELECT
             COUNT(*) AS total,
-            SUM(CASE WHEN EXISTS(SELECT 1 FROM dt_siswa s WHERE s.nisn = ppdb_calon_siswa.nisn AND s.id_tahun_ajaran = $id_ta_aktif) THEN 1 ELSE 0 END) AS ditarik
+            SUM(CASE WHEN EXISTS(SELECT 1 FROM dt_siswa s WHERE s.nisn = ppdb_calon_siswa.nisn AND s.id_tahun_ajaran = ?) THEN 1 ELSE 0 END) AS ditarik
          FROM ppdb_calon_siswa
-         WHERE status = 4"
+         WHERE status = 4 AND tahun_ajaran = ?"
     );
-    if ($q_stat) {
-        $d_stat = $q_stat->fetch_assoc();
+    $q_stat->bind_param("ii", $id_ta_aktif, $id_ta_aktif);
+    $q_stat->execute();
+    $d_stat = $q_stat->get_result()->fetch_assoc();
+    $q_stat->close();
+    if ($d_stat) {
         $total_diterima = (int)$d_stat['total'];
         $sudah_ditarik = (int)$d_stat['ditarik'];
         $belum_ditarik = $total_diterima - $sudah_ditarik;
@@ -52,22 +68,24 @@ if ($id_ta_aktif > 0) {
 }
 
 // ==========================================================
-// 3. DAFTAR CALON SISWA DITERIMA
+// 3. DAFTAR CALON SISWA DITERIMA per TA terpilih
 // ==========================================================
 $daftar_calon = [];
 if ($id_ta_aktif > 0) {
-    $q_calon = $koneksi->query(
+    $q_calon = $koneksi->prepare(
         "SELECT cs.*,
-            EXISTS(SELECT 1 FROM dt_siswa s WHERE s.nisn = cs.nisn AND s.id_tahun_ajaran = $id_ta_aktif) AS sudah_ditarik
+            EXISTS(SELECT 1 FROM dt_siswa s WHERE s.nisn = cs.nisn AND s.id_tahun_ajaran = ?) AS sudah_ditarik
          FROM ppdb_calon_siswa cs
-         WHERE cs.status = 4
+         WHERE cs.status = 4 AND cs.tahun_ajaran = ?
          ORDER BY cs.nama_siswa ASC"
     );
-    if ($q_calon) {
-        while ($row = $q_calon->fetch_assoc()) {
-            $daftar_calon[] = $row;
-        }
+    $q_calon->bind_param("ii", $id_ta_aktif, $id_ta_aktif);
+    $q_calon->execute();
+    $res = $q_calon->get_result();
+    while ($row = $res->fetch_assoc()) {
+        $daftar_calon[] = $row;
     }
+    $q_calon->close();
 }
 ?>
 
@@ -87,7 +105,7 @@ if ($id_ta_aktif > 0) {
         </div>
         <p class="small text-muted mt-2">
             Daftar calon siswa <b>DITERIMA</b> (status 4) dari data PPDB yang siap ditarik menjadi siswa aktif.
-            Tahun Ajaran Aktif: <b><?= $nama_ta_aktif; ?></b>
+            Tahun Ajaran: <b><?= $nama_ta_aktif; ?></b>
         </p>
     </div>
 </div>
@@ -101,6 +119,22 @@ if ($id_ta_aktif > 0) {
                 Tahun ajaran aktif tidak ditemukan. Atur terlebih dahulu di menu <b>Data Referensi &rarr; Tahun Ajaran</b>.
             </div>
         <?php else : ?>
+
+            <div class="alert alert-info py-2 mb-3 shadow-sm">
+                <i class="bi bi-info-circle-fill me-1"></i>
+                Calon siswa PPDB ditampilkan <b>per tahun ajaran</b>. Pilih tahun ajaran:
+                <form method="get" class="d-inline" style="margin:0;">
+                    <input type="hidden" name="menu" value="tarik_siswa_ppdb">
+                    <select name="ta" class="form-select form-select-sm d-inline-block w-auto" onchange="this.form.submit()">
+                        <?php foreach ($ta_list as $t): ?>
+                            <option value="<?= (int)$t['id_tahun_ajaran']; ?>" <?= ($id_ta_filter == (int)$t['id_tahun_ajaran']) ? 'selected' : ''; ?>>
+                                <?= htmlspecialchars($t['tahun_ajaran']); ?> <?= $t['status'] === 'aktif' ? '<span class="badge bg-success text-xs ms-1">Aktif</span>' : ''; ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </form>
+                Terpilih: <b><?= $nama_ta_aktif; ?></b>.
+            </div>
 
             <div class="row">
                 <div class="col-lg-4 col-md-6 col-sm-12">
@@ -143,6 +177,7 @@ if ($id_ta_aktif > 0) {
                             <div class="d-flex flex-wrap justify-content-between gap-2 mb-3">
                                 <form method="POST" action="aksi/tarik_ppdb.php" class="d-inline"
                                     onsubmit="return confirm('Tarik SEMUA calon siswa yang belum ditarik menjadi siswa aktif Tahun Ajaran <?= $nama_ta_aktif; ?>?');">
+                                    <input type="hidden" name="id_ta" value="<?= (int)$id_ta_aktif; ?>">
                                     <button type="submit" name="tarik_semua" class="btn btn-success" <?= ($belum_ditarik <= 0) ? 'disabled' : ''; ?>>
                                         <i class="bi bi-cloud-download-fill me-1"></i> Tarik Semua Yang Belum (<?= number_format($belum_ditarik); ?>)
                                     </button>
@@ -215,6 +250,7 @@ if ($id_ta_aktif > 0) {
                                                             <form method="POST" action="aksi/tarik_ppdb.php" class="d-inline"
                                                                 onsubmit="return confirm('Tarik calon siswa <?= addslashes($nama); ?> menjadi siswa aktif Tahun Ajaran <?= $nama_ta_aktif; ?>?');">
                                                                 <input type="hidden" name="id_calon" value="<?= $id_calon; ?>">
+                                                                <input type="hidden" name="id_ta" value="<?= (int)$id_ta_aktif; ?>">
                                                                 <button type="submit" name="tarik_calon" class="btn btn-success btn-sm" title="Tarik ke Data Siswa Aktif">
                                                                     <i class="bi bi-download me-1"></i> Tarik
                                                                 </button>

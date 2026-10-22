@@ -9,17 +9,17 @@ const AKSES_MENU = [
     'Admin' => '*',
     'Kurikulum' => [
         'beranda', 'data_sekolah', 'kop_sekolah', 'tahun_ajar', 'jurusan', 'mapel', 'guru_mapel', 'sekretaris_kelas', 'kelas',
-        'guru', 'wali_kelas', 'pengampu_mapel', 'jadwal', 'rekap_absensi', 'rekap_jurnal', 'jurnal_kelas', 'kalender_akademik', 'siswa_aktif', 'siswa_tambah', 'siswa_detail', 'siswa_edit',
+        'guru', 'wali_kelas', 'pengampu_mapel', 'jadwal', 'dashboard_wali_kelas', 'rekap_absensi', 'rekap_jurnal', 'jurnal_kelas', 'kalender_akademik', 'siswa_aktif', 'siswa_tambah', 'siswa_detail', 'siswa_edit',
         'penempatan_kelas', 'kenaikan_kelas', 'info_kelas', 'detail_kelas', 'rekap_kelas',
         'denah_siswa', 'alumni', 'tarik_siswa_ppdb', 'foto_siswa', 'kartu_siswa',
     ],
     'Kesiswaan' => [
-        'beranda', 'kelas', 'wali_kelas', 'siswa_aktif', 'siswa_tambah', 'siswa_detail', 'siswa_edit',
+        'beranda', 'kelas', 'wali_kelas', 'dashboard_wali_kelas', 'siswa_aktif', 'siswa_tambah', 'siswa_detail', 'siswa_edit',
         'penempatan_kelas', 'kenaikan_kelas', 'info_kelas', 'detail_kelas', 'rekap_kelas',
         'denah_siswa', 'alumni', 'tarik_siswa_ppdb', 'foto_siswa', 'kartu_siswa',
     ],
     'Guru' => [
-        'beranda', 'info_kelas', 'detail_kelas', 'denah_siswa', 'wali_kelas', 'siswa_aktif', 'siswa_detail',
+        'beranda', 'dashboard_wali_kelas', 'info_kelas', 'detail_kelas', 'denah_siswa', 'wali_kelas', 'siswa_aktif', 'siswa_detail',
     ],
 ];
 

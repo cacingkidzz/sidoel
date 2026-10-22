@@ -106,10 +106,15 @@ if ($q_kw) {
                     <div class="card card-outline card-primary">
                         <div class="card-header d-flex justify-content-between align-items-center">
                             <h5 class="card-title mb-0"><i class="bi bi-person-bounding-box me-1"></i> Tabel Wali Kelas</h5>
-                            <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#tambahWali"
-                                <?= ($id_ta_aktif == 0 || empty($kelas_tanpa_wali) || empty($guru_tersedia)) ? 'disabled' : '' ?>>
-                                <i class="bi bi-plus-circle-fill me-1"></i> Tambah Wali Kelas
-                            </button>
+                            <div class="d-flex gap-2">
+                                <a href="../walikelas/login.php" target="_blank" class="btn btn-outline-success btn-sm">
+                                    <i class="bi bi-phone me-1"></i> Portal Wali Kelas
+                                </a>
+                                <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#tambahWali"
+                                    <?= ($id_ta_aktif == 0 || empty($kelas_tanpa_wali) || empty($guru_tersedia)) ? 'disabled' : '' ?>>
+                                    <i class="bi bi-plus-circle-fill me-1"></i> Tambah Wali Kelas
+                                </button>
+                            </div>
                         </div>
                         <div class="card-body">
                             <?php if (empty($kelas_tanpa_wali) && empty($semua_guru) === false): ?>

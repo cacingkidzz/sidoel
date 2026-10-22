@@ -5,26 +5,48 @@ if (session_status() == PHP_SESSION_NONE) {
 include('koneksi.php');
 
 // ==========================================================
-// Tahun ajaran aktif
+// Tahun ajaran aktif (dari session)
 // ==========================================================
-$ta_nama = $_SESSION['tahun_ajaran_aktif'] ?? '';
-$id_ta = 0;
-$q = $koneksi->prepare("SELECT id_tahun_ajaran, tahun_ajaran FROM dt_tahun_ajar WHERE tahun_ajaran = ? LIMIT 1");
-$q->bind_param("s", $ta_nama);
-$q->execute();
-$row_ta = $q->get_result()->fetch_assoc();
-$q->close();
-if (!$row_ta) {
-    $q = $koneksi->query("SELECT id_tahun_ajaran, tahun_ajaran FROM dt_tahun_ajar WHERE status='aktif' LIMIT 1");
-    $row_ta = $q ? $q->fetch_assoc() : null;
-}
-if ($row_ta) {
-    $id_ta = (int)$row_ta['id_tahun_ajaran'];
-    $ta_nama = $row_ta['tahun_ajaran'];
+$ta_nama_sesi = $_SESSION['tahun_ajaran_aktif'] ?? '';
+$id_ta_sesi = 0;
+$q_sesi = $koneksi->prepare("SELECT id_tahun_ajaran FROM dt_tahun_ajar WHERE tahun_ajaran = ? LIMIT 1");
+$q_sesi->bind_param("s", $ta_nama_sesi);
+$q_sesi->execute();
+$r_sesi = $q_sesi->get_result()->fetch_assoc();
+$q_sesi->close();
+if ($r_sesi) $id_ta_sesi = (int)$r_sesi['id_tahun_ajaran'];
+
+// TA yang dipilih filter (default = aktif dari session)
+$id_ta_filter = (int)($_GET['ta'] ?? $id_ta_sesi);
+$ta_nama = '-';
+if ($id_ta_filter > 0) {
+    $q_ta = $koneksi->prepare("SELECT id_tahun_ajaran, tahun_ajaran FROM dt_tahun_ajar WHERE id_tahun_ajaran = ? LIMIT 1");
+    $q_ta->bind_param("i", $id_ta_filter);
+    $q_ta->execute();
+    $row_ta = $q_ta->get_result()->fetch_assoc();
+    $q_ta->close();
+    if ($row_ta) {
+        $id_ta = (int)$row_ta['id_tahun_ajaran'];
+        $ta_nama = $row_ta['tahun_ajaran'];
+    }
+} else {
+    $id_ta = $id_ta_sesi;
+    $ta_nama = $ta_nama_sesi ?: '-';
 }
 
 // ==========================================================
-// Daftar siswa (TA aktif) dikelompokkan per kelas
+// Daftar semua tahun ajaran (untuk filter dropdown)
+// ==========================================================
+$ta_list = [];
+$q_ta_all = $koneksi->query("SELECT id_tahun_ajaran, tahun_ajaran, status FROM dt_tahun_ajar ORDER BY tahun_ajaran DESC");
+if ($q_ta_all) {
+    while ($rt = $q_ta_all->fetch_assoc()) {
+        $ta_list[] = $rt;
+    }
+}
+
+// ==========================================================
+// Daftar siswa (TA terpilih) dikelompokkan per kelas
 // ==========================================================
 $siswa_list = [];
 if ($id_ta > 0) {
@@ -53,23 +75,36 @@ foreach ($siswa_list as $s) {
 }
 
 // ==========================================================
-// Daftar akun sekretaris
+// Daftar akun sekretaris (filter TA terpilih, atau semua bila 0)
 // ==========================================================
 $sek_list = [];
-$q = $koneksi->query("
+$where_ta = '';
+$params = [];
+$types = '';
+if ($id_ta > 0) {
+    $where_ta = "WHERE sk.id_tahun_ajaran = ?";
+    $params[] = $id_ta;
+    $types = 'i';
+}
+$q = $koneksi->prepare("
     SELECT sk.id_sekretaris, sk.username, sk.status_aktif, sk.id_siswa, sk.id_kelas, sk.id_tahun_ajaran,
            s.nama AS nama_siswa, k.tingkat, k.nama_kelas, ta.tahun_ajaran
     FROM dt_sekretaris sk
     LEFT JOIN dt_siswa s ON s.id_siswa = sk.id_siswa
     LEFT JOIN dt_kelas k ON k.id_kelas = sk.id_kelas
     LEFT JOIN dt_tahun_ajar ta ON ta.id_tahun_ajaran = sk.id_tahun_ajaran
+    $where_ta
     ORDER BY ta.tahun_ajaran DESC, k.tingkat ASC, k.nama_kelas ASC, s.nama ASC
 ");
-if ($q) {
-    while ($r = $q->fetch_assoc()) {
-        $sek_list[] = $r;
-    }
+if ($params) {
+    $q->bind_param($types, ...$params);
 }
+$q->execute();
+$res = $q->get_result();
+while ($r = $res->fetch_assoc()) {
+    $sek_list[] = $r;
+}
+$q->close();
 ?>
 <main class="app-main">
     <div class="app-content-header">
@@ -93,7 +128,18 @@ if ($q) {
             <div class="alert alert-info py-2 mb-3 shadow-sm">
                 <i class="bi bi-info-circle-fill me-1"></i>
                 Akun untuk <b>sekretaris kelas</b> (login terpisah di <code>/sekretaris</code>). Sekretaris mengisi
-                <b>jurnal mengajar &amp; absensi</b> kelasnya. Akun berlaku per tahun ajaran aktif: <b><?= htmlspecialchars($ta_nama ?: '-'); ?></b>.
+                <b>jurnal mengajar &amp; absensi</b> kelasnya. Akun berlaku per tahun ajaran:
+                <form method="get" class="d-inline" style="margin:0;">
+                    <input type="hidden" name="menu" value="sekretaris_kelas">
+                    <select name="ta" class="form-select form-select-sm d-inline-block w-auto" onchange="this.form.submit()">
+                        <?php foreach ($ta_list as $t): ?>
+                            <option value="<?= (int)$t['id_tahun_ajaran']; ?>" <?= ($id_ta_filter == (int)$t['id_tahun_ajaran']) ? 'selected' : ''; ?>>
+                                <?= htmlspecialchars($t['tahun_ajaran']); ?> <?= $t['status'] === 'aktif' ? '<span class="badge bg-success text-xs ms-1">Aktif</span>' : ''; ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </form>
+                Terpilih: <b><?= htmlspecialchars($ta_nama); ?></b>.
             </div>
 
             <?php if (isset($_SESSION['alert'])): ?>
@@ -114,9 +160,9 @@ if ($q) {
                 </div>
                 <div class="card-body">
                     <?php if ($id_ta <= 0): ?>
-                        <div class="alert alert-warning mb-0">Belum ada tahun ajaran aktif.</div>
+                        <div class="alert alert-warning mb-0">Tidak ada tahun ajaran terpilih.</div>
                     <?php elseif (empty($siswa_list)): ?>
-                        <div class="alert alert-warning mb-0">Belum ada siswa terdaftar di kelas pada tahun ajaran aktif.</div>
+                        <div class="alert alert-warning mb-0">Belum ada siswa terdaftar di kelas pada tahun ajaran <b><?= htmlspecialchars($ta_nama); ?></b>.</div>
                     <?php endif; ?>
 
                     <div class="table-responsive">
