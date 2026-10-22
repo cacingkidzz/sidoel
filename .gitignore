@@ -1,0 +1,37 @@
+# === SiDoel .gitignore ===
+
+# Dependensi Composer (jangan di-commit; jalankan composer install di production)
+admin/vendor/
+
+# Backup database hasil fitur Backup & Restore
+admin/backup/*.sql
+
+# Dump database di root proyek
+*.sql
+**/*.sql
+
+# File foto siswa/guru (upload user, tidak di-commit)
+admin/assets/img/foto_siswa/*
+admin/assets/img/foto_guru/*
+
+# Log dan cache
+*.log
+admin/*.log
+
+# OS & editor
+Thumbs.db
+.DS_Store
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Environment / sensitive (buat production nanti)
+.env
+.env.local
+config.php
+
+# Temporary test files
+tmp/
+temp/
+*.tmp
