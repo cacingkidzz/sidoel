@@ -41,7 +41,7 @@ if (isset($_POST['login'])) {
 
     // 1. Cari user berdasarkan username
     // Query tetap ke dt_user sesuai permintaan
-    $sql = "SELECT id_user, username, password, level_user, status_aktif FROM dt_user WHERE username = '$username'";
+    $sql = "SELECT id_user, username, password, level_user, status_aktif, id_fk FROM dt_user WHERE username = '$username'";
     $query = $koneksi->query($sql);
 
     if ($query && $query->num_rows == 1) {
@@ -65,6 +65,7 @@ if (isset($_POST['login'])) {
                 $_SESSION['id_user'] = $user['id_user'];
                 $_SESSION['username'] = $user['username'];
                 $_SESSION['level_user'] = $user['level_user'];
+                $_SESSION['id_fk'] = (int)($user['id_fk'] ?? 0);
 
                 // Catat login berhasil
                 audit_write($koneksi, 'login', 'ok', 'login', 'login', 'Login berhasil: ' . $user['username']);

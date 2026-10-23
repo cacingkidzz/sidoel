@@ -44,6 +44,9 @@
                 case 'siswa_aktif': // (dt_siswa) - Penambahan baru
                     include('konten/siswa_aktif.php');
                     break;
+                case 'kelengkapan_siswa': // Monitoring persentase kelengkapan data siswa
+                    include('konten/kelengkapan_siswa.php');
+                    break;
                 case 'foto_siswa': // Manajemen foto siswa bulk
                     include('konten/foto_siswa.php');
                     break;

@@ -203,7 +203,12 @@ while ($g = $qguru->fetch_assoc()) {
                                                 <td><?= $no++; ?></td>
                                                 <td><?= htmlspecialchars($row['username']); ?></td>
                                                 <td><?= htmlspecialchars($nama_user_display); ?></td>
-                                                <td><span class="badge <?= $badge_class ?>"><?= htmlspecialchars($row['level_user']); ?></span></td>
+                                                <td>
+                                                    <span class="badge <?= $badge_class ?>"><?= htmlspecialchars($row['level_user']); ?></span>
+                                                    <?php if ($row['level_user'] !== 'Guru' && !empty($row['id_fk'])): ?>
+                                                        <span class="badge bg-primary" title="Terhubung ke data guru &amp; Portal Guru/Wali">Guru</span>
+                                                    <?php endif; ?>
+                                                </td>
                                                 <td><span class="badge <?= $status_class ?>"><?= $status_text; ?></span></td>
                                                 <td class="text-center">
                                                     <button type="button" class="btn btn-success btn-sm me-1" data-bs-toggle="modal" data-bs-target="#editdata<?= $row['id_user'] ?>" title="Reset Password">
@@ -289,7 +294,7 @@ while ($g = $qguru->fetch_assoc()) {
                     <input type="hidden" name="aksi" value="tambah">
 
                     <div class="mb-3">
-                        <label class="form-label fw-bold">Pilih Guru (Relasi)</label>
+                        <label class="form-label fw-bold">Guru Terkait (Akses Portal Guru/Wali)</label>
                         <select class="form-select select2" name="id_fk" id="id_fk_guru" required>
                             <option value="">-- Pilih Guru yang Belum Punya Akun --</option>
                             <?php foreach ($guru_data as $g): ?>
@@ -300,7 +305,7 @@ while ($g = $qguru->fetch_assoc()) {
                                 </option>
                             <?php endforeach; ?>
                         </select>
-                        <small class="form-text text-muted">Hanya menampilkan guru yang belum memiliki akun login.</small>
+                        <small class="form-text text-muted">Relasi ini juga memberi akses Portal Guru/Wali Kelas. Level utama tetap menentukan menu Admin (mis. Kesiswaan yang juga mengajar cukup pilih level Kesiswaan + guru terkait).</small>
                     </div>
 
                     <div class="mb-3">

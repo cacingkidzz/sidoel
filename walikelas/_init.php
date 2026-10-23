@@ -1,27 +1,27 @@
 <?php
 /**
- * Inisialisasi mini-app Wali Kelas (session terpisah dari admin & sekretaris).
- * Login memakai akun dt_user dengan level_user = 'Guru' (relasi id_fk = id_guru).
+ * Inisialisasi mini-app Wali Kelas.
+ * Memakai session bersama Portal (SIDOELPORTAL) dan akun dt_user level 'Guru'
+ * (relasi id_fk = id_guru) yang login lewat portal/login.php.
  */
-if (session_status() === PHP_SESSION_NONE) {
-    session_name('SIDOELWK');
-    session_start();
-}
-
-date_default_timezone_set('Asia/Makassar');
-
-require_once __DIR__ . '/../admin/koneksi.php';
+require_once __DIR__ . '/../portal/_init.php';
 require_once __DIR__ . '/../admin/konten/helper_laporan.php';
 
 function wk_logged_in(): bool
 {
-    return !empty($_SESSION['walikelas']['id_user']);
+    return portal_logged_in();
 }
 
 function wk_wajib_login(): void
 {
     if (!wk_logged_in()) {
-        header('Location: login.php');
+        header('Location: ../portal/login.php');
+        exit;
+    }
+    $db = $GLOBALS['koneksi'] ?? null;
+    if ($db && !portal_has_role($db, 'wali')) {
+        portal_flash_set('warning', 'Anda belum ditugaskan sebagai wali kelas pada tahun ajaran aktif.');
+        header('Location: ../portal/index.php');
         exit;
     }
 }

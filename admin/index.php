@@ -58,7 +58,7 @@ if (!boleh_menu($level_user, $activeMenu)) {
 // --- LOGIKA GRUP MENU (Dropdown) ---
 
 // Grup Data Referensi
-$dataReferensiMenus = ['data_sekolah', 'kop_sekolah', 'tahun_ajar', 'user', 'jurusan', 'mapel', 'kelas'];
+$dataReferensiMenus = ['data_sekolah', 'kop_sekolah', 'tahun_ajar', 'jurusan', 'mapel', 'kelas'];
 $isDataReferensiActive = in_array($activeMenu, $dataReferensiMenus);
 
 // Grup Penerimaan Siswa Baru (PPDB) (BARU)
@@ -66,20 +66,25 @@ $ppdbMenus = ['tarik_siswa_ppdb'];
 $isPPDBActive = in_array($activeMenu, $ppdbMenus);
 
 // Grup Data Siswa
-$siswaMenus = ['siswa_aktif', 'penempatan_kelas', 'kenaikan_kelas', 'denah_siswa', 'alumni', 'foto_siswa'];
+$siswaMenus = ['siswa_aktif', 'kelengkapan_siswa', 'penempatan_kelas', 'kenaikan_kelas', 'denah_siswa', 'alumni', 'foto_siswa', 'info_kelas'];
 $isSiswaActive = in_array($activeMenu, $siswaMenus);
 
+// Grup Kelas & Penugasan (wali/sekretaris; dipisah agar Kesiswaan tidak melihat menu KBM)
+$kelasPenugasanMenus = ['wali_kelas', 'sekretaris_kelas'];
+$isKelasPenugasanActive = in_array($activeMenu, $kelasPenugasanMenus);
+
 // Grup Pendidikan & KBM (dipecah menjadi sub-grup agar sidebar rapi)
-$kbmReferensiMenus = ['guru_mapel', 'pengampu_mapel', 'wali_kelas', 'sekretaris_kelas', 'info_kelas'];
+$kbmReferensiMenus = ['guru_mapel', 'pengampu_mapel'];
 $isKbmReferensiActive = in_array($activeMenu, $kbmReferensiMenus);
 
-$kbmPembelajaranMenus = ['jadwal', 'jurnal_kelas', 'kalender_akademik'];
+$kbmPembelajaranMenus = ['jadwal', 'kalender_akademik'];
 $isKbmPembelajaranActive = in_array($activeMenu, $kbmPembelajaranMenus);
 
-$kbmRekapMenus = ['dashboard_wali_kelas', 'rekap_absensi', 'rekap_jurnal'];
-$isKbmRekapActive = in_array($activeMenu, $kbmRekapMenus);
+// Grup Monitoring & Rekap (dipisah dari KBM agar Kesiswaan tetap rapi)
+$monitoringMenus = ['dashboard_wali_kelas', 'rekap_absensi', 'rekap_jurnal', 'jurnal_kelas'];
+$isMonitoringActive = in_array($activeMenu, $monitoringMenus);
 
-$kbmMenus = array_merge($kbmReferensiMenus, $kbmPembelajaranMenus, $kbmRekapMenus);
+$kbmMenus = array_merge($kbmReferensiMenus, $kbmPembelajaranMenus);
 $isKBMActive = in_array($activeMenu, $kbmMenus);
 
 // Grup Laporan & Cetak
@@ -87,7 +92,7 @@ $laporanMenus = ['kartu_siswa'];
 $isLaporanActive = in_array($activeMenu, $laporanMenus);
 
 // Grup Administrasi Sistem
-$administrasiMenus = ['audit_log', 'backup_restore', 'manajemen_ta'];
+$administrasiMenus = ['user', 'audit_log', 'backup_restore', 'manajemen_ta'];
 $isAdministrasiActive = in_array($activeMenu, $administrasiMenus);
 
 
@@ -340,6 +345,9 @@ $isAdministrasiActive = in_array($activeMenu, $administrasiMenus);
                         <ul class="dropdown-menu dropdown-menu-end shadow">
                             <li><h6 class="dropdown-header">Masuk sebagai <b><?= htmlspecialchars($username) ?></b></h6></li>
                             <li><a class="dropdown-item" href="?menu=profil"><i class="bi bi-person-gear me-2"></i>Profil Saya</a></li>
+                            <?php if (!empty($_SESSION['id_fk']) && ($_SESSION['level_user'] ?? '') !== 'Admin'): ?>
+                                <li><a class="dropdown-item" href="../portal/index.php" target="_blank" rel="noopener"><i class="bi bi-grid-1x2-fill me-2"></i>Portal Guru/Wali</a></li>
+                            <?php endif; ?>
                             <li><hr class="dropdown-divider"></li>
                             <li><a class="dropdown-item text-danger" href="aksi/aksi_login.php?aksi=logout"><i class="bi bi-box-arrow-right me-2"></i>Logout</a></li>
                         </ul>
@@ -415,9 +423,11 @@ $isAdministrasiActive = in_array($activeMenu, $administrasiMenus);
                             </a>
                         </li>
 
+                        <?php if (ada_menu_izin($level_user, ['data_sekolah', 'kop_sekolah', 'tahun_ajar', 'jurusan', 'mapel', 'kelas', 'guru'])): ?>
                         <li class="nav-header">DATA MASTER</li>
+                        <?php endif; ?>
 
-                        <?php if (ada_menu_izin($level_user, ['data_sekolah', 'kop_sekolah', 'tahun_ajar', 'jurusan', 'mapel', 'kelas', 'user'])): ?>
+                        <?php if (ada_menu_izin($level_user, ['data_sekolah', 'kop_sekolah', 'tahun_ajar', 'jurusan', 'mapel', 'kelas'])): ?>
                         <li class="nav-item <?php echo $isDataReferensiActive ? 'menu-open' : ''; ?>">
                             <a href="#" class="nav-link <?php echo $isDataReferensiActive ? 'active' : ''; ?>">
                                 <i class="nav-icon bi bi-database"></i>
@@ -480,15 +490,6 @@ $isAdministrasiActive = in_array($activeMenu, $administrasiMenus);
                                     </a>
                                 </li>
                                 <?php endif; ?>
-                                <?php if (boleh_menu($level_user, 'user')): ?>
-                                <li class="nav-item">
-                                    <a href="?menu=user"
-                                        class="nav-link <?php echo ($activeMenu == 'user') ? 'active' : ''; ?>">
-                                        <i class="nav-icon bi bi-person"></i>
-                                        <p>User Pengguna</p>
-                                    </a>
-                                </li>
-                                <?php endif; ?>
                             </ul>
                         </li>
                         <?php endif; ?>
@@ -514,7 +515,7 @@ $isAdministrasiActive = in_array($activeMenu, $administrasiMenus);
                         </li>
                         <?php endif; ?>
 
-                        <?php if (ada_menu_izin($level_user, ['siswa_aktif', 'penempatan_kelas', 'kenaikan_kelas', 'denah_siswa', 'alumni', 'foto_siswa'])): ?>
+                        <?php if (ada_menu_izin($level_user, ['siswa_aktif', 'kelengkapan_siswa', 'penempatan_kelas', 'kenaikan_kelas', 'info_kelas', 'denah_siswa', 'alumni', 'foto_siswa'])): ?>
                         <li class="nav-header">DATA SISWA</li>
 
                         <li class="nav-item <?php echo $isSiswaActive ? 'menu-open' : ''; ?>">
@@ -535,12 +536,30 @@ $isAdministrasiActive = in_array($activeMenu, $administrasiMenus);
                                     </a>
                                 </li>
                                 <?php endif; ?>
+                                <?php if (boleh_menu($level_user, 'kelengkapan_siswa')): ?>
+                                <li class="nav-item">
+                                    <a href="?menu=kelengkapan_siswa"
+                                        class="nav-link <?php echo ($activeMenu == 'kelengkapan_siswa') ? 'active' : ''; ?>">
+                                        <i class="nav-icon bi bi-clipboard2-check"></i>
+                                        <p>Kelengkapan Data</p>
+                                    </a>
+                                </li>
+                                <?php endif; ?>
                                 <?php if (boleh_menu($level_user, 'penempatan_kelas')): ?>
                                 <li class="nav-item">
                                     <a href="?menu=penempatan_kelas"
                                         class="nav-link <?php echo ($activeMenu == 'penempatan_kelas') ? 'active' : ''; ?>">
                                         <i class="nav-icon bi bi-list-columns"></i>
                                         <p>Atur Penempatan Kelas</p>
+                                    </a>
+                                </li>
+                                <?php endif; ?>
+                                <?php if (boleh_menu($level_user, 'info_kelas')): ?>
+                                <li class="nav-item">
+                                    <a href="?menu=info_kelas"
+                                        class="nav-link <?php echo ($activeMenu == 'info_kelas') ? 'active' : ''; ?>">
+                                        <i class="nav-icon bi bi-info-circle"></i>
+                                        <p>Info Kelas / Rombel</p>
                                     </a>
                                 </li>
                                 <?php endif; ?>
@@ -584,6 +603,29 @@ $isAdministrasiActive = in_array($activeMenu, $administrasiMenus);
                         </li>
                         <?php endif; ?>
 
+                        <?php if (ada_menu_izin($level_user, $kelasPenugasanMenus)): ?>
+                        <li class="nav-header">KELAS &amp; PENUGASAN</li>
+
+                        <?php if (boleh_menu($level_user, 'wali_kelas')): ?>
+                        <li class="nav-item">
+                            <a href="?menu=wali_kelas"
+                                class="nav-link <?php echo ($activeMenu == 'wali_kelas') ? 'active' : ''; ?>">
+                                <i class="nav-icon bi bi-person-bounding-box"></i>
+                                <p>Penugasan Wali Kelas</p>
+                            </a>
+                        </li>
+                        <?php endif; ?>
+                        <?php if (boleh_menu($level_user, 'sekretaris_kelas')): ?>
+                        <li class="nav-item">
+                            <a href="?menu=sekretaris_kelas"
+                                class="nav-link <?php echo ($activeMenu == 'sekretaris_kelas') ? 'active' : ''; ?>">
+                                <i class="nav-icon bi bi-person-badge"></i>
+                                <p>Sekretaris Kelas</p>
+                            </a>
+                        </li>
+                        <?php endif; ?>
+                        <?php endif; ?>
+
                         <?php if (ada_menu_izin($level_user, $kbmMenus)): ?>
                         <li class="nav-header">PENDIDIKAN &amp; KBM</li>
 
@@ -615,33 +657,6 @@ $isAdministrasiActive = in_array($activeMenu, $administrasiMenus);
                                     </a>
                                 </li>
                                 <?php endif; ?>
-                                <?php if (boleh_menu($level_user, 'wali_kelas')): ?>
-                                <li class="nav-item">
-                                    <a href="?menu=wali_kelas"
-                                        class="nav-link <?php echo ($activeMenu == 'wali_kelas') ? 'active' : ''; ?>">
-                                        <i class="nav-icon bi bi-person-bounding-box"></i>
-                                        <p>Penugasan Wali Kelas</p>
-                                    </a>
-                                </li>
-                                <?php endif; ?>
-                                <?php if (boleh_menu($level_user, 'sekretaris_kelas')): ?>
-                                <li class="nav-item">
-                                    <a href="?menu=sekretaris_kelas"
-                                        class="nav-link <?php echo ($activeMenu == 'sekretaris_kelas') ? 'active' : ''; ?>">
-                                        <i class="nav-icon bi bi-person-badge"></i>
-                                        <p>Sekretaris Kelas</p>
-                                    </a>
-                                </li>
-                                <?php endif; ?>
-                                <?php if (boleh_menu($level_user, 'info_kelas')): ?>
-                                <li class="nav-item">
-                                    <a href="?menu=info_kelas"
-                                        class="nav-link <?php echo ($activeMenu == 'info_kelas') ? 'active' : ''; ?>">
-                                        <i class="nav-icon bi bi-info-circle"></i>
-                                        <p>Info Kelas / Rombel</p>
-                                    </a>
-                                </li>
-                                <?php endif; ?>
                             </ul>
                         </li>
                         <?php endif; ?>
@@ -665,15 +680,6 @@ $isAdministrasiActive = in_array($activeMenu, $administrasiMenus);
                                     </a>
                                 </li>
                                 <?php endif; ?>
-                                <?php if (boleh_menu($level_user, 'jurnal_kelas')): ?>
-                                <li class="nav-item">
-                                    <a href="?menu=jurnal_kelas"
-                                        class="nav-link <?php echo ($activeMenu == 'jurnal_kelas') ? 'active' : ''; ?>">
-                                        <i class="nav-icon bi bi-journal-bookmark"></i>
-                                        <p>Jurnal Kelas</p>
-                                    </a>
-                                </li>
-                                <?php endif; ?>
                                 <?php if (boleh_menu($level_user, 'kalender_akademik')): ?>
                                 <li class="nav-item">
                                     <a href="?menu=kalender_akademik"
@@ -687,44 +693,45 @@ $isAdministrasiActive = in_array($activeMenu, $administrasiMenus);
                         </li>
                         <?php endif; ?>
 
-                        <?php if (ada_menu_izin($level_user, $kbmRekapMenus)): ?>
-                        <li class="nav-item <?php echo $isKbmRekapActive ? 'menu-open' : ''; ?>">
-                            <a href="#" class="nav-link <?php echo $isKbmRekapActive ? 'active' : ''; ?>">
-                                <i class="nav-icon bi bi-clipboard2-data"></i>
-                                <p>
-                                    Rekap &amp; Monitoring
-                                    <i class="nav-arrow bi bi-chevron-right"></i>
-                                </p>
+                        <?php endif; ?>
+
+                        <?php if (ada_menu_izin($level_user, $monitoringMenus)): ?>
+                        <li class="nav-header">MONITORING &amp; REKAP</li>
+
+                        <?php if (boleh_menu($level_user, 'dashboard_wali_kelas')): ?>
+                        <li class="nav-item">
+                            <a href="?menu=dashboard_wali_kelas"
+                                class="nav-link <?php echo ($activeMenu == 'dashboard_wali_kelas') ? 'active' : ''; ?>">
+                                <i class="nav-icon bi bi-speedometer2"></i>
+                                <p>Dashboard Wali Kelas</p>
                             </a>
-                            <ul class="nav nav-treeview">
-                                <?php if (boleh_menu($level_user, 'dashboard_wali_kelas')): ?>
-                                <li class="nav-item">
-                                    <a href="?menu=dashboard_wali_kelas"
-                                        class="nav-link <?php echo ($activeMenu == 'dashboard_wali_kelas') ? 'active' : ''; ?>">
-                                        <i class="nav-icon bi bi-speedometer2"></i>
-                                        <p>Dashboard Wali Kelas</p>
-                                    </a>
-                                </li>
-                                <?php endif; ?>
-                                <?php if (boleh_menu($level_user, 'rekap_absensi')): ?>
-                                <li class="nav-item">
-                                    <a href="?menu=rekap_absensi"
-                                        class="nav-link <?php echo ($activeMenu == 'rekap_absensi') ? 'active' : ''; ?>">
-                                        <i class="nav-icon bi bi-clipboard-data"></i>
-                                        <p>Rekap Absensi</p>
-                                    </a>
-                                </li>
-                                <?php endif; ?>
-                                <?php if (boleh_menu($level_user, 'rekap_jurnal')): ?>
-                                <li class="nav-item">
-                                    <a href="?menu=rekap_jurnal"
-                                        class="nav-link <?php echo ($activeMenu == 'rekap_jurnal') ? 'active' : ''; ?>">
-                                        <i class="nav-icon bi bi-journal-text"></i>
-                                        <p>Rekap Jurnal Guru</p>
-                                    </a>
-                                </li>
-                                <?php endif; ?>
-                            </ul>
+                        </li>
+                        <?php endif; ?>
+                        <?php if (boleh_menu($level_user, 'rekap_absensi')): ?>
+                        <li class="nav-item">
+                            <a href="?menu=rekap_absensi"
+                                class="nav-link <?php echo ($activeMenu == 'rekap_absensi') ? 'active' : ''; ?>">
+                                <i class="nav-icon bi bi-clipboard-data"></i>
+                                <p>Rekap Absensi</p>
+                            </a>
+                        </li>
+                        <?php endif; ?>
+                        <?php if (boleh_menu($level_user, 'rekap_jurnal')): ?>
+                        <li class="nav-item">
+                            <a href="?menu=rekap_jurnal"
+                                class="nav-link <?php echo ($activeMenu == 'rekap_jurnal') ? 'active' : ''; ?>">
+                                <i class="nav-icon bi bi-journal-text"></i>
+                                <p>Rekap Jurnal Guru</p>
+                            </a>
+                        </li>
+                        <?php endif; ?>
+                        <?php if (boleh_menu($level_user, 'jurnal_kelas')): ?>
+                        <li class="nav-item">
+                            <a href="?menu=jurnal_kelas"
+                                class="nav-link <?php echo ($activeMenu == 'jurnal_kelas') ? 'active' : ''; ?>">
+                                <i class="nav-icon bi bi-journal-bookmark"></i>
+                                <p>Jurnal Kelas</p>
+                            </a>
                         </li>
                         <?php endif; ?>
                         <?php endif; ?>
@@ -743,6 +750,16 @@ $isAdministrasiActive = in_array($activeMenu, $administrasiMenus);
 
                         <?php if (ada_menu_izin($level_user, $administrasiMenus)): ?>
                         <li class="nav-header">ADMINISTRASI SISTEM</li>
+
+                        <?php if (boleh_menu($level_user, 'user')): ?>
+                        <li class="nav-item">
+                            <a href="?menu=user"
+                                class="nav-link <?php echo ($activeMenu == 'user') ? 'active' : ''; ?>">
+                                <i class="nav-icon bi bi-person"></i>
+                                <p>User Pengguna</p>
+                            </a>
+                        </li>
+                        <?php endif; ?>
 
                         <?php if (boleh_menu($level_user, 'audit_log')): ?>
                         <li class="nav-item">

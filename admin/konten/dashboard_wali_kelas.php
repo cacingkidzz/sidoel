@@ -10,6 +10,7 @@
  */
 include('koneksi.php');
 require_once(__DIR__ . '/helper_laporan.php');
+require_once(__DIR__ . '/../helper_kelengkapan.php');
 require_once(__DIR__ . '/../akses.php');
 
 $level_user = $_SESSION['level_user'] ?? 'Guru';
@@ -175,7 +176,7 @@ $jml_hari_efektif = count($hari_efektif);
 $roster = [];
 $total_siswa = 0;
 if ($id_kelas > 0 && $id_ta > 0) {
-    $stmt = $koneksi->prepare("SELECT s.id_siswa, s.nama, s.jk, s.nisn, s.nipd
+    $stmt = $koneksi->prepare("SELECT s.*
                                FROM dt_kelas_siswa ks
                                INNER JOIN dt_siswa s ON s.id_siswa = ks.id_siswa
                                WHERE ks.id_kelas = ? AND ks.id_tahun_ajaran = ?
@@ -189,6 +190,32 @@ if ($id_kelas > 0 && $id_ta > 0) {
     }
 }
 $total_siswa = count($roster);
+
+// ---- Kelengkapan data wajib per siswa ----
+$kel_map = [];
+$sum_kel_pct = 0.0;
+$jml_kel_lengkap = 0;
+$kel_field_kosong = [];
+foreach (kel_required_fields() as $kf) {
+    $kel_field_kosong[$kf['key']] = 0;
+}
+foreach ($roster as $sw) {
+    $k = kel_baris($sw);
+    $kel_map[(int)$sw['id_siswa']] = $k;
+    $sum_kel_pct += $k['pct'];
+    if ($k['lengkap']) $jml_kel_lengkap++;
+    foreach ($k['missing_keys'] as $mk) {
+        if (isset($kel_field_kosong[$mk])) $kel_field_kosong[$mk]++;
+    }
+}
+$avg_kel_pct = $total_siswa > 0 ? round($sum_kel_pct / $total_siswa, 1) : 0.0;
+$jml_kel_belum = $total_siswa - $jml_kel_lengkap;
+$kel_terlemah = null;
+foreach (kel_required_fields() as $kf) {
+    if ($kel_terlemah === null || $kel_field_kosong[$kf['key']] > $kel_terlemah['kosong']) {
+        $kel_terlemah = ['label' => $kf['label'], 'kosong' => $kel_field_kosong[$kf['key']]];
+    }
+}
 
 // ---- Absensi sebulan (per tanggal & status) ----
 $abs_month = [];
@@ -572,8 +599,8 @@ $abs_label = ['H' => 'Hadir', 'S' => 'Sakit', 'I' => 'Izin', 'A' => 'Alpa'];
             </div>
         <?php endif; ?>
 
-        <div class="row row-cols-1 row-cols-sm-2 row-cols-xl-4 g-3 mb-3">
-            <div class="col">
+        <div class="row g-3 mb-3">
+            <div class="col-12 col-sm-6 col-xl">
                 <div class="card h-100 border-0 shadow-sm">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-start">
@@ -587,7 +614,7 @@ $abs_label = ['H' => 'Hadir', 'S' => 'Sakit', 'I' => 'Izin', 'A' => 'Alpa'];
                     </div>
                 </div>
             </div>
-            <div class="col">
+            <div class="col-12 col-sm-6 col-xl">
                 <div class="card h-100 border-0 shadow-sm">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-start">
@@ -605,7 +632,7 @@ $abs_label = ['H' => 'Hadir', 'S' => 'Sakit', 'I' => 'Izin', 'A' => 'Alpa'];
                     </div>
                 </div>
             </div>
-            <div class="col">
+            <div class="col-12 col-sm-6 col-xl">
                 <div class="card h-100 border-0 shadow-sm">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-start">
@@ -627,7 +654,7 @@ $abs_label = ['H' => 'Hadir', 'S' => 'Sakit', 'I' => 'Izin', 'A' => 'Alpa'];
                     </div>
                 </div>
             </div>
-            <div class="col">
+            <div class="col-12 col-sm-6 col-xl">
                 <div class="card h-100 border-0 shadow-sm">
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-start">
@@ -640,6 +667,23 @@ $abs_label = ['H' => 'Hadir', 'S' => 'Sakit', 'I' => 'Izin', 'A' => 'Alpa'];
                         </div>
                         <div class="progress mt-2" style="height:6px;">
                             <div class="progress-bar bg-info" style="width:<?= $jml_hari_efektif > 0 ? min(100, round($hari_terisi / $jml_hari_efektif * 100)) : 0; ?>%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-sm-6 col-xl">
+                <div class="card h-100 border-0 shadow-sm">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <div class="text-muted small text-uppercase">Kelengkapan Data</div>
+                                <div class="fs-2 fw-bold text-<?= kel_cls($avg_kel_pct); ?>"><?= number_format($avg_kel_pct, 1, ',', '.'); ?>%</div>
+                                <div class="small text-muted"><?= $jml_kel_lengkap; ?> lengkap &middot; <?= $jml_kel_belum; ?> belum</div>
+                            </div>
+                            <span class="badge bg-<?= kel_cls($avg_kel_pct); ?>-subtle text-<?= kel_cls($avg_kel_pct); ?> fs-6 rounded-circle p-2"><i class="bi bi-clipboard2-check fs-5"></i></span>
+                        </div>
+                        <div class="progress mt-2" style="height:6px;">
+                            <div class="progress-bar bg-<?= kel_cls($avg_kel_pct); ?>" style="width:<?= max(0, min(100, $avg_kel_pct)); ?>%"></div>
                         </div>
                     </div>
                 </div>
@@ -847,6 +891,76 @@ $abs_label = ['H' => 'Hadir', 'S' => 'Sakit', 'I' => 'Izin', 'A' => 'Alpa'];
                             <div class="d-flex justify-content-between"><span>Realisasi jurnal</span><b><?= $pct_jurnal_bulan; ?>%</b></div>
                             <div class="d-flex justify-content-between"><span>Kehadiran bulan ini</span><b><?= $pct_kehadiran_bulan; ?>%</b></div>
                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3 mt-0">
+            <div class="col-12">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-white fw-semibold d-flex flex-wrap justify-content-between align-items-center gap-2">
+                        <span><i class="bi bi-clipboard2-check me-1 text-success"></i> Kelengkapan Data Siswa</span>
+                        <span class="small text-muted fw-normal">
+                            Rata-rata kelas <b class="text-<?= kel_cls($avg_kel_pct); ?>"><?= number_format($avg_kel_pct, 1, ',', '.'); ?>%</b>
+                            &middot; <?= $jml_kel_lengkap; ?>/<?= $total_siswa; ?> lengkap
+                            <?php if ($kel_terlemah && $kel_terlemah['kosong'] > 0) : ?>
+                                &middot; paling kosong: <b><?= htmlspecialchars($kel_terlemah['label']); ?></b> (<?= (int)$kel_terlemah['kosong']; ?> siswa)
+                            <?php endif; ?>
+                        </span>
+                    </div>
+                    <div class="card-body p-0">
+                        <?php if (empty($roster)) : ?>
+                            <div class="p-3 text-muted small"><i class="bi bi-inbox me-1"></i> Belum ada siswa pada kelas ini.</div>
+                        <?php else : ?>
+                            <div class="table-responsive" style="max-height:360px;">
+                                <table class="table table-sm table-hover align-middle mb-0">
+                                    <thead class="table-light sticky-top">
+                                        <tr>
+                                            <th>Nama Siswa</th>
+                                            <th class="text-nowrap">NIS</th>
+                                            <th class="text-center text-nowrap">Terisi</th>
+                                            <th style="min-width:150px;">Kelengkapan</th>
+                                            <th>Field Wajib Kosong</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($roster as $sw) :
+                                            $k = $kel_map[(int)$sw['id_siswa']] ?? kel_baris($sw);
+                                        ?>
+                                            <tr>
+                                                <td class="small">
+                                                    <?php if (boleh_menu($level_user, 'siswa_detail')) : ?>
+                                                        <a href="index.php?menu=siswa_detail&id=<?= (int)$sw['id_siswa']; ?>" class="text-decoration-none"><?= htmlspecialchars($sw['nama']); ?></a>
+                                                    <?php else : ?>
+                                                        <?= htmlspecialchars($sw['nama']); ?>
+                                                    <?php endif; ?>
+                                                </td>
+                                                <td class="small text-muted text-nowrap"><?= htmlspecialchars($sw['nipd'] ?: '-'); ?></td>
+                                                <td class="text-center small text-nowrap"><?= (int)$k['filled']; ?>/<?= (int)$k['total']; ?></td>
+                                                <td>
+                                                    <div class="d-flex align-items-center gap-2">
+                                                        <div class="progress flex-grow-1" style="height:6px;">
+                                                            <div class="progress-bar bg-<?= kel_cls($k['pct']); ?>" style="width:<?= max(0, min(100, $k['pct'])); ?>%"></div>
+                                                        </div>
+                                                        <span class="small fw-semibold text-<?= kel_cls($k['pct']); ?>" style="min-width:44px;text-align:right;"><?= number_format($k['pct'], 1, ',', '.'); ?>%</span>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <?php if (empty($k['missing'])) : ?>
+                                                        <span class="badge bg-success-subtle text-success"><i class="bi bi-check2 me-1"></i>Lengkap</span>
+                                                    <?php else : ?>
+                                                        <?php foreach ($k['missing'] as $ml) : ?>
+                                                            <span class="badge bg-danger-subtle text-danger fw-normal mb-1"><?= htmlspecialchars($ml); ?></span>
+                                                        <?php endforeach; ?>
+                                                    <?php endif; ?>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>

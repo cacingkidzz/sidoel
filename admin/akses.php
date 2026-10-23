@@ -7,19 +7,28 @@
 // Izin menu per level user. '*' = semua menu.
 const AKSES_MENU = [
     'Admin' => '*',
+    // Akademik & KBM: data master akademik, penugasan, jadwal, monitoring, dan data siswa.
     'Kurikulum' => [
-        'beranda', 'data_sekolah', 'kop_sekolah', 'tahun_ajar', 'jurusan', 'mapel', 'guru_mapel', 'sekretaris_kelas', 'kelas',
-        'guru', 'wali_kelas', 'pengampu_mapel', 'jadwal', 'dashboard_wali_kelas', 'rekap_absensi', 'rekap_jurnal', 'jurnal_kelas', 'kalender_akademik', 'siswa_aktif', 'siswa_tambah', 'siswa_detail', 'siswa_edit',
-        'penempatan_kelas', 'kenaikan_kelas', 'info_kelas', 'detail_kelas', 'rekap_kelas',
+        'beranda',
+        'data_sekolah', 'kop_sekolah', 'tahun_ajar', 'jurusan', 'mapel', 'kelas', 'guru',
+        'guru_mapel', 'pengampu_mapel', 'wali_kelas', 'sekretaris_kelas',
+        'jadwal', 'kalender_akademik',
+        'dashboard_wali_kelas', 'rekap_absensi', 'rekap_jurnal', 'jurnal_kelas',
+        'siswa_aktif', 'kelengkapan_siswa', 'siswa_tambah', 'siswa_detail', 'siswa_edit',
+        'import_preview', 'penempatan_kelas', 'kenaikan_kelas', 'info_kelas', 'detail_kelas', 'rekap_kelas',
         'denah_siswa', 'alumni', 'tarik_siswa_ppdb', 'foto_siswa', 'kartu_siswa',
     ],
+    // Kesiswaan: kelas, siswa, PPDB, alumni, penugasan wali/sekretaris, monitoring kelas.
     'Kesiswaan' => [
-        'beranda', 'kelas', 'wali_kelas', 'dashboard_wali_kelas', 'siswa_aktif', 'siswa_tambah', 'siswa_detail', 'siswa_edit',
-        'penempatan_kelas', 'kenaikan_kelas', 'info_kelas', 'detail_kelas', 'rekap_kelas',
+        'beranda', 'kelas',
+        'wali_kelas', 'sekretaris_kelas',
+        'dashboard_wali_kelas', 'rekap_absensi', 'jurnal_kelas',
+        'siswa_aktif', 'kelengkapan_siswa', 'siswa_tambah', 'siswa_detail', 'siswa_edit',
+        'import_preview', 'penempatan_kelas', 'kenaikan_kelas', 'info_kelas', 'detail_kelas', 'rekap_kelas',
         'denah_siswa', 'alumni', 'tarik_siswa_ppdb', 'foto_siswa', 'kartu_siswa',
     ],
     'Guru' => [
-        'beranda', 'dashboard_wali_kelas', 'info_kelas', 'detail_kelas', 'denah_siswa', 'wali_kelas', 'siswa_aktif', 'siswa_detail',
+        'beranda', 'dashboard_wali_kelas', 'info_kelas', 'detail_kelas', 'denah_siswa', 'siswa_aktif', 'siswa_detail',
     ],
 ];
 

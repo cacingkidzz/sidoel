@@ -47,7 +47,8 @@ $kelas_label = trim((string)($kelas_label ?? ''));
                 <?= wk_esc($wk_nama) ?><?php if ($kelas_label !== ''): ?> &middot; <?= wk_esc($kelas_label) ?><?php endif; ?>
             </div>
         </div>
-        <a href="logout.php" class="btn btn-sm btn-light" title="Keluar"><i class="bi bi-box-arrow-right"></i></a>
+        <a href="../portal/index.php" class="btn btn-sm btn-light" title="Menu Portal"><i class="bi bi-grid-1x2-fill"></i></a>
+        <a href="../portal/logout.php" class="btn btn-sm btn-light" title="Keluar"><i class="bi bi-box-arrow-right"></i></a>
     </div>
 </div>
 <div class="container py-3" style="max-width:760px;">

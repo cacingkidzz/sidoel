@@ -214,6 +214,9 @@ if (!function_exists('avatar_color_guru')) {
                                 <a href="aksi/export_guru.php" class="btn btn-danger ms-auto" target="_blank">
                                     <i class="bi bi-file-earmark-arrow-down-fill me-1"></i> Download Data Guru
                                 </a>
+                                <a href="../portal/login.php" class="btn btn-warning" target="_blank" rel="noopener">
+                                    <i class="bi bi-box-arrow-up-right me-1"></i> Portal Guru
+                                </a>
                             </div>
                             <div class="table-responsive">
                                 <table id="myTable1" class="table table-bordered table-striped table-hover align-middle">

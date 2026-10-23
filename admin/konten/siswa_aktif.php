@@ -141,6 +141,12 @@ $result_siswa = isset($koneksi) ? mysqli_query($koneksi, $query_siswa) : false;
                                     <a href="index.php?menu=kenaikan_kelas" class="btn btn-warning text-dark">
                                         <i class="bi bi-arrow-up-circle-fill me-1"></i> Ambil/Naik Kelas
                                     </a>
+                                    <a href="../siswa/login.php" class="btn btn-outline-primary" target="_blank">
+                                        <i class="bi bi-phone me-1"></i> Portal Siswa
+                                    </a>
+                                    <a href="index.php?menu=kelengkapan_siswa" class="btn btn-outline-success">
+                                        <i class="bi bi-clipboard2-check me-1"></i> Kelengkapan Data
+                                    </a>
                                 </div>
 
                                 <div class="d-flex flex-wrap gap-2">
