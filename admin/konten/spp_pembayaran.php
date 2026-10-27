@@ -492,7 +492,7 @@ unset($_SESSION['spp_kwitansi_multi']);
                                         </div>
                                         <div class="col-md-6">
                                             <label class="form-label fw-bold mb-1">Nominal (Rp)</label>
-                                            <input type="number" name="nominal" class="form-control" min="1" max="<?= (int)$sisa; ?>" step="1000" value="<?= (int)$sisa; ?>" required>
+                                            <input type="number" name="nominal" class="form-control" min="1" max="<?= (int)$sisa; ?>" step="any" value="<?= (int)$sisa; ?>" required>
                                             <div class="form-text">Boleh diisi sebagian untuk angsuran (maks <?= spp_rupiah($sisa); ?>).</div>
                                         </div>
                                         <div class="col-md-6">
@@ -880,7 +880,7 @@ unset($_SESSION['spp_kwitansi_multi']);
                                 inp.value = Math.round(b.sisa);
                                 inp.min = 1;
                                 inp.max = Math.round(b.sisa);
-                                inp.step = 1000;
+                                inp.step = 'any';
                                 inp.disabled = true;
                                 inp.addEventListener('input', hitung);
                                 tdNom.appendChild(inp);
