@@ -412,6 +412,99 @@ if (!function_exists('spp_status_badge')) {
     }
 }
 
+if (!function_exists('spp_bulan_singkat')) {
+    /** Nama bulan 3 huruf untuk header tabel: "Jul", "Agu", ... */
+    function spp_bulan_singkat(int $bulan): string
+    {
+        $peta = [
+            1 => 'Jan', 2 => 'Feb', 3 => 'Mar', 4 => 'Apr', 5 => 'Mei', 6 => 'Jun',
+            7 => 'Jul', 8 => 'Agu', 9 => 'Sep', 10 => 'Okt', 11 => 'Nov', 12 => 'Des',
+        ];
+        return $peta[$bulan] ?? ('B' . $bulan);
+    }
+}
+
+if (!function_exists('spp_matriks_kelas')) {
+    /**
+     * Roster + tagihan satu kelas pada satu TA (bahan tabel pembayaran 12 bulan).
+     *
+     * Hasil:
+     *   siswa    : id_siswa => [id_siswa, nama, nipd, nisn, jk]
+     *   tagihan  : id_siswa => ["YYYY-MM" => baris dt_spp_tagihan]
+     *   terbayar : id_tagihan => total dibayar
+     *   total / terbayar_total / sisa_total : ringkasan kelas
+     *
+     * @return array<string,mixed>
+     */
+    function spp_matriks_kelas($koneksi, int $id_ta, int $id_kelas): array
+    {
+        $out = [
+            'siswa' => [],
+            'tagihan' => [],
+            'terbayar' => [],
+            'total' => 0.0,
+            'terbayar_total' => 0.0,
+            'sisa_total' => 0.0,
+        ];
+        if ($id_ta <= 0 || $id_kelas <= 0 || !($koneksi instanceof mysqli)) {
+            return $out;
+        }
+
+        // Roster kelas (history-aware).
+        $sql = "SELECT s.id_siswa, s.nama, s.nipd, s.nisn, s.jk
+                  FROM dt_kelas_siswa ks
+                  INNER JOIN dt_siswa s ON s.id_siswa = ks.id_siswa
+                 WHERE ks.id_tahun_ajaran = ? AND ks.id_kelas = ?
+                 ORDER BY s.nama ASC";
+        $stmt = $koneksi->prepare($sql);
+        if (!$stmt) {
+            return $out;
+        }
+        $stmt->bind_param('ii', $id_ta, $id_kelas);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        $ids = [];
+        while ($r = $res->fetch_assoc()) {
+            $id = (int)$r['id_siswa'];
+            $out['siswa'][$id] = $r;
+            $ids[] = $id;
+        }
+        $stmt->close();
+        if (!$ids) {
+            return $out;
+        }
+
+        // Tagihan seluruh siswa kelas tsb pada TA ini.
+        $in = implode(',', $ids);
+        $q = $koneksi->query("SELECT id_tagihan, id_siswa, tahun, bulan, nominal, potongan, total, status
+                                FROM dt_spp_tagihan
+                               WHERE id_tahun_ajaran = " . (int)$id_ta . "
+                                 AND id_siswa IN ($in)
+                               ORDER BY tahun ASC, bulan ASC");
+        $tag_ids = [];
+        if ($q) {
+            while ($r = $q->fetch_assoc()) {
+                $key = sprintf('%04d-%02d', (int)$r['tahun'], (int)$r['bulan']);
+                $out['tagihan'][(int)$r['id_siswa']][$key] = $r;
+                $tag_ids[] = (int)$r['id_tagihan'];
+            }
+        }
+
+        $out['terbayar'] = spp_terbayar_map($koneksi, $tag_ids);
+
+        foreach ($out['tagihan'] as $list) {
+            foreach ($list as $t) {
+                $bayar = (float)($out['terbayar'][(int)$t['id_tagihan']] ?? 0);
+                $out['total'] += (float)$t['total'];
+                $out['terbayar_total'] += $bayar;
+            }
+        }
+        $out['sisa_total'] = max(0, $out['total'] - $out['terbayar_total']);
+
+        return $out;
+    }
+}
+
 if (!function_exists('spp_siswa_ringkas')) {
     /** Data ringkas siswa + kelas pada TA (history-aware). */
     function spp_siswa_ringkas($koneksi, int $id_siswa, int $id_ta): ?array

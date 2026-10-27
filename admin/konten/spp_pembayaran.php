@@ -197,6 +197,13 @@ if ($id_ta <= 0 && !empty($ta_list)) {
 }
 $ta = spp_ta_info($koneksi, $id_ta);
 
+// Filter kelas (tabel pembayaran 12 bulan per kelas)
+$kelas_list = spp_kelas_list($koneksi, $id_ta);
+$f_kelas = (int)($_GET['kelas'] ?? 0);
+if ($f_kelas > 0 && !isset($kelas_list[$f_kelas])) {
+    $f_kelas = 0; // kelas bukan milik TA ini
+}
+
 // ==========================================================
 // SATU TAGIHAN (form pembayaran)
 // ==========================================================
@@ -299,6 +306,14 @@ if (!empty($hasil_siswa)) {
 }
 
 // ==========================================================
+// MATRIKS KELAS (tabel siswa x 12 bulan)
+// ==========================================================
+$matriks = null;
+if ($id_tagihan <= 0 && $f_kelas > 0) {
+    $matriks = spp_matriks_kelas($koneksi, $id_ta, $f_kelas);
+}
+
+// ==========================================================
 // PEMBAYARAN TERBARU
 // ==========================================================
 $terbaru = [];
@@ -316,6 +331,8 @@ if ($q3) {
 }
 $kwitansi_baru = (int)($_SESSION['spp_kwitansi_terakhir'] ?? 0);
 unset($_SESSION['spp_kwitansi_terakhir']);
+$kwitansi_multi = $_SESSION['spp_kwitansi_multi'] ?? [];
+unset($_SESSION['spp_kwitansi_multi']);
 ?>
 <main class="app-main">
     <div class="app-content-header">
@@ -353,19 +370,33 @@ unset($_SESSION['spp_kwitansi_terakhir']);
                 </div>
             <?php endif; ?>
 
+            <?php if (!empty($kwitansi_multi)): ?>
+                <div class="alert alert-success">
+                    <div class="fw-semibold mb-1"><i class="bi bi-check-circle-fill me-1"></i>Pembayaran tersimpan. Klik bulan untuk mencetak kwitansinya:</div>
+                    <div class="d-flex flex-wrap gap-2">
+                        <?php foreach ($kwitansi_multi as $km): ?>
+                            <a href="index.php?menu=spp_pembayaran&kwitansi=<?= (int)$km['id_bayar']; ?>" target="_blank"
+                               class="btn btn-sm btn-outline-success">
+                                <i class="bi bi-printer me-1"></i><?= htmlspecialchars((string)$km['label']); ?>
+                            </a>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+            <?php endif; ?>
+
             <?php if (!$ta): ?>
                 <div class="alert alert-warning">Tahun ajaran belum dipilih / tidak valid.</div>
             <?php else: ?>
 
-            <!-- ================= CARI SISWA ================= -->
+            <!-- ================= CARI / FILTER ================= -->
             <div class="card card-outline card-primary mb-3">
                 <div class="card-header">
-                    <h5 class="mb-0"><i class="bi bi-search me-1"></i> Cari Tagihan Siswa</h5>
+                    <h5 class="mb-0"><i class="bi bi-search me-1"></i> Cari / Filter Tagihan</h5>
                 </div>
                 <div class="card-body">
                     <form method="get" class="row g-2 align-items-end">
                         <input type="hidden" name="menu" value="spp_pembayaran">
-                        <div class="col-md-3">
+                        <div class="col-md-2">
                             <label class="form-label fw-bold mb-1">Tahun Ajaran</label>
                             <select name="ta" class="form-select">
                                 <?php foreach ($ta_list as $t): ?>
@@ -375,14 +406,28 @@ unset($_SESSION['spp_kwitansi_terakhir']);
                                 <?php endforeach; ?>
                             </select>
                         </div>
-                        <div class="col-md-7">
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold mb-1">Kelas</label>
+                            <select name="kelas" class="form-select" onchange="this.form.submit()">
+                                <option value="0">— Semua kelas / cari per siswa —</option>
+                                <?php foreach ($kelas_list as $kl): ?>
+                                    <option value="<?= (int)$kl['id_kelas']; ?>" <?= ($f_kelas === (int)$kl['id_kelas']) ? 'selected' : ''; ?>>
+                                        <?= htmlspecialchars($kl['label']); ?> · <?= (int)$kl['jumlah_siswa']; ?> siswa
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
                             <label class="form-label fw-bold mb-1">NIS / NISN / Nama Siswa</label>
-                            <input type="text" name="q" class="form-control" value="<?= htmlspecialchars($f_q); ?>" placeholder="mis. 5924 atau nama siswa" autofocus>
+                            <input type="text" name="q" class="form-control" value="<?= htmlspecialchars($f_q); ?>" placeholder="mis. 5924 atau nama siswa">
                         </div>
                         <div class="col-md-2">
                             <button type="submit" class="btn btn-primary w-100"><i class="bi bi-search me-1"></i>Cari</button>
                         </div>
                     </form>
+                    <div class="small text-muted mt-2">
+                        <i class="bi bi-info-circle me-1"></i>Pilih <b>Kelas</b> untuk menampilkan tabel pembayaran 12 bulan seluruh siswa kelas tersebut.
+                    </div>
                 </div>
             </div>
 
@@ -531,8 +576,360 @@ unset($_SESSION['spp_kwitansi_terakhir']);
                 </div>
             <?php endif; ?>
 
+            <!-- ================= MATRIKS KELAS (12 BULAN) ================= -->
+            <?php if ($matriks !== null): ?>
+                <?php
+                $kls = $kelas_list[$f_kelas];
+                $periode = $ta['periode'];
+                $jml_siswa = count($matriks['siswa']);
+                $jml_tagihan = 0;
+                foreach ($matriks['tagihan'] as $lst) {
+                    $jml_tagihan += count($lst);
+                }
+                ?>
+                <div class="card card-outline card-primary mb-3">
+                    <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+                        <div>
+                            <h5 class="mb-0"><i class="bi bi-grid-3x3-gap me-1"></i> Pembayaran SPP — <?= htmlspecialchars($kls['label']); ?></h5>
+                            <div class="small text-muted">TA <?= htmlspecialchars((string)$ta['nama']); ?> &middot; <?= $jml_siswa; ?> siswa &middot; <?= $jml_tagihan; ?> tagihan</div>
+                        </div>
+                        <div class="d-flex flex-wrap gap-2 small">
+                            <span class="badge text-bg-light border">Total tagihan <b><?= spp_rupiah($matriks['total']); ?></b></span>
+                            <span class="badge text-bg-light border">Terbayar <b class="text-success"><?= spp_rupiah($matriks['terbayar_total']); ?></b></span>
+                            <span class="badge text-bg-light border">Tunggakan <b class="text-danger"><?= spp_rupiah($matriks['sisa_total']); ?></b></span>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <?php if ($jml_siswa === 0): ?>
+                            <div class="alert alert-warning mb-0">Kelas ini belum memiliki siswa pada tahun ajaran terpilih.</div>
+                        <?php elseif ($jml_tagihan === 0): ?>
+                            <div class="alert alert-warning mb-0">
+                                Belum ada tagihan untuk kelas ini. Generate dulu di menu
+                                <a href="index.php?menu=spp_tagihan&ta=<?= (int)$id_ta; ?>&kelas=<?= (int)$f_kelas; ?>" class="alert-link">Tagihan SPP</a>.
+                            </div>
+                        <?php else: ?>
+                            <div class="table-responsive">
+                                <table class="table table-sm table-bordered align-middle mb-0" id="tblSppKelas">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th class="text-center" style="width:40px">No</th>
+                                            <th style="min-width:190px">Nama Siswa</th>
+                                            <?php foreach ($periode as $p): ?>
+                                                <th class="text-center" style="min-width:74px" title="<?= htmlspecialchars($p['label']); ?>">
+                                                    <?= htmlspecialchars(spp_bulan_singkat((int)$p['bulan'])); ?>
+                                                    <div class="fw-normal text-muted" style="font-size:.72rem"><?= (int)$p['tahun']; ?></div>
+                                                </th>
+                                            <?php endforeach; ?>
+                                            <th class="text-end" style="min-width:100px">Sisa</th>
+                                            <th class="text-center" style="width:96px">Aksi</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php $no = 1; foreach ($matriks['siswa'] as $id_siswa => $sw): ?>
+                                            <?php
+                                            $list = $matriks['tagihan'][$id_siswa] ?? [];
+                                            $sisa_siswa = 0.0;
+                                            $bulan_belum = 0;
+                                            foreach ($list as $t) {
+                                                $byr = (float)($matriks['terbayar'][(int)$t['id_tagihan']] ?? 0);
+                                                $sisa_t = max(0, (float)$t['total'] - $byr);
+                                                $sisa_siswa += $sisa_t;
+                                                if ($sisa_t > 0) {
+                                                    $bulan_belum++;
+                                                }
+                                            }
+                                            ?>
+                                            <tr>
+                                                <td class="text-center small"><?= $no++; ?></td>
+                                                <td>
+                                                    <div class="fw-semibold"><?= htmlspecialchars((string)$sw['nama']); ?></div>
+                                                    <div class="small text-muted">NIS <?= htmlspecialchars((string)$sw['nipd']); ?></div>
+                                                </td>
+                                                <?php foreach ($periode as $p): ?>
+                                                    <?php
+                                                    $key = sprintf('%04d-%02d', (int)$p['tahun'], (int)$p['bulan']);
+                                                    $t = $list[$key] ?? null;
+                                                    if (!$t):
+                                                    ?>
+                                                        <td class="text-center text-muted" title="Belum digenerate">&mdash;</td>
+                                                    <?php else:
+                                                        $id_tag = (int)$t['id_tagihan'];
+                                                        $byr = (float)($matriks['terbayar'][$id_tag] ?? 0);
+                                                        $sisa_t = max(0, (float)$t['total'] - $byr);
+                                                        $cls = $sisa_t <= 0 ? 'table-success' : ($byr > 0 ? 'table-warning' : 'table-danger');
+                                                    ?>
+                                                        <td class="text-center p-0 <?= $cls; ?>">
+                                                            <a href="index.php?menu=spp_pembayaran&tagihan=<?= $id_tag; ?>"
+                                                               class="d-block py-1 px-1 text-decoration-none text-reset"
+                                                               title="<?= htmlspecialchars($p['label']); ?>">
+                                                                <span class="small"><?= $sisa_t <= 0 ? 'Lunas' : spp_rupiah($sisa_t, ''); ?></span>
+                                                            </a>
+                                                        </td>
+                                                    <?php endif; ?>
+                                                <?php endforeach; ?>
+                                                <td class="text-end small <?= $sisa_siswa > 0 ? 'text-danger fw-semibold' : 'text-success'; ?>">
+                                                    <?= spp_rupiah($sisa_siswa, ''); ?>
+                                                </td>
+                                                <td class="text-center">
+                                                    <?php if ($bulan_belum > 0): ?>
+                                                        <button type="button" class="btn btn-sm btn-success"
+                                                                data-bs-toggle="modal" data-bs-target="#modalBayar"
+                                                                data-siswa="<?= (int)$id_siswa; ?>">
+                                                            <i class="bi bi-cash-coin me-1"></i>Bayar
+                                                        </button>
+                                                    <?php else: ?>
+                                                        <span class="badge bg-success"><i class="bi bi-check2 me-1"></i>Lunas</span>
+                                                    <?php endif; ?>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="small text-muted mt-2">
+                                <span class="badge bg-success">&nbsp;&nbsp;&nbsp;</span> Lunas &middot;
+                                <span class="badge bg-warning text-dark">&nbsp;&nbsp;&nbsp;</span> Sebagian &middot;
+                                <span class="badge bg-danger">&nbsp;&nbsp;&nbsp;</span> Belum &middot;
+                                <span class="text-muted">&mdash;</span> belum digenerate.
+                                Angka pada sel = <b>sisa tagihan</b> bulan tsb; klik sel untuk membuka rincian bulan.
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+
+                <?php if ($jml_siswa > 0 && $jml_tagihan > 0): ?>
+                    <?php
+                    // Data untuk modal bayar bersama: hanya bulan yang belum lunas.
+                    $js_data = [];
+                    foreach ($matriks['siswa'] as $id_siswa => $sw) {
+                        $list = $matriks['tagihan'][$id_siswa] ?? [];
+                        $bulan = [];
+                        foreach ($periode as $p) {
+                            $key = sprintf('%04d-%02d', (int)$p['tahun'], (int)$p['bulan']);
+                            $t = $list[$key] ?? null;
+                            if (!$t) {
+                                continue;
+                            }
+                            $id_tag = (int)$t['id_tagihan'];
+                            $byr = (float)($matriks['terbayar'][$id_tag] ?? 0);
+                            $sisa_t = round(max(0, (float)$t['total'] - $byr), 2);
+                            if ($sisa_t <= 0.005) {
+                                continue;
+                            }
+                            $bulan[] = [
+                                'id' => $id_tag,
+                                'label' => (string)$p['label'],
+                                'total' => (float)$t['total'],
+                                'bayar' => $byr,
+                                'sisa' => $sisa_t,
+                            ];
+                        }
+                        if (!$bulan) {
+                            continue;
+                        }
+                        $js_data[(int)$id_siswa] = [
+                            'id' => (int)$id_siswa,
+                            'nama' => (string)$sw['nama'],
+                            'nipd' => (string)$sw['nipd'],
+                            'bulan' => $bulan,
+                        ];
+                    }
+                    ?>
+                    <div class="modal fade" id="modalBayar" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                            <form class="modal-content" id="formBayar" action="aksi/aksi_spp_pembayaran.php" method="post">
+                                <input type="hidden" name="aksi" value="bayar_bulanan">
+                                <input type="hidden" name="id_siswa" id="mbIdSiswa" value="0">
+                                <input type="hidden" name="ta" value="<?= (int)$id_ta; ?>">
+                                <input type="hidden" name="kelas" value="<?= (int)$f_kelas; ?>">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">
+                                        <i class="bi bi-cash-coin me-1"></i>Bayar SPP — <span id="mbNama">-</span>
+                                    </h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <div class="small text-muted mb-2">
+                                        NIS <span id="mbNis">-</span> &middot; <?= htmlspecialchars($kls['label']); ?> &middot;
+                                        Centang bulan yang dibayar. Nominal otomatis = sisa tagihan bulan tsb (bisa diubah untuk angsuran).
+                                    </div>
+                                    <div class="table-responsive">
+                                        <table class="table table-sm align-middle mb-0">
+                                            <thead class="table-light">
+                                                <tr>
+                                                    <th class="text-center" style="width:40px">
+                                                        <input type="checkbox" class="form-check-input" id="mbSemua" title="Pilih semua bulan yang belum lunas">
+                                                    </th>
+                                                    <th>Bulan</th>
+                                                    <th class="text-end">Total</th>
+                                                    <th class="text-end">Dibayar</th>
+                                                    <th class="text-end">Sisa</th>
+                                                    <th class="text-end" style="width:150px">Nominal bayar</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="mbBody"></tbody>
+                                            <tfoot>
+                                                <tr class="fw-bold">
+                                                    <td colspan="5" class="text-end">Total dibayar</td>
+                                                    <td class="text-end" id="mbTotal">Rp 0</td>
+                                                </tr>
+                                            </tfoot>
+                                        </table>
+                                    </div>
+                                    <div class="row g-2 mt-3">
+                                        <div class="col-md-4">
+                                            <label class="form-label fw-bold mb-1">Tanggal bayar</label>
+                                            <input type="date" name="tanggal_bayar" class="form-control form-control-sm"
+                                                   value="<?= date('Y-m-d'); ?>" max="<?= date('Y-m-d'); ?>" required>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label fw-bold mb-1">Metode</label>
+                                            <select name="metode" class="form-select form-select-sm">
+                                                <?php foreach (['Tunai', 'Transfer', 'QRIS', 'Lainnya'] as $m): ?>
+                                                    <option value="<?= $m; ?>"><?= $m; ?></option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <label class="form-label fw-bold mb-1">No. referensi <span class="fw-normal text-muted">(opsional)</span></label>
+                                            <input type="text" name="no_referensi" class="form-control form-control-sm" maxlength="100">
+                                        </div>
+                                        <div class="col-12">
+                                            <label class="form-label fw-bold mb-1">Keterangan <span class="fw-normal text-muted">(opsional)</span></label>
+                                            <input type="text" name="keterangan" class="form-control form-control-sm" maxlength="255">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
+                                    <button type="submit" class="btn btn-success">
+                                        <i class="bi bi-save me-1"></i>Simpan Pembayaran
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    <script>
+                        (function () {
+                            var DATA = <?= json_encode($js_data, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT); ?>;
+                            var modalEl = document.getElementById('modalBayar');
+                            if (!modalEl) { return; }
+                            var form = document.getElementById('formBayar');
+                            var body = document.getElementById('mbBody');
+                            var totalEl = document.getElementById('mbTotal');
+                            var semuaEl = document.getElementById('mbSemua');
+                            var namaEl = document.getElementById('mbNama');
+                            var nisEl = document.getElementById('mbNis');
+                            var idEl = document.getElementById('mbIdSiswa');
+
+                            function rupiah(n) {
+                                return 'Rp ' + Math.round(n).toLocaleString('id-ID');
+                            }
+
+                            function hitung() {
+                                var total = 0;
+                                body.querySelectorAll('.spp-cek').forEach(function (cb) {
+                                    var tr = cb.closest('tr');
+                                    var inp = tr ? tr.querySelector('.spp-nominal') : null;
+                                    if (cb.checked) {
+                                        if (inp) { inp.disabled = false; }
+                                        total += inp ? (parseFloat(inp.value) || 0) : 0;
+                                    } else if (inp) {
+                                        inp.disabled = true;
+                                    }
+                                });
+                                if (totalEl) { totalEl.textContent = rupiah(total); }
+                            }
+
+                            function buatBaris(b) {
+                                var tr = document.createElement('tr');
+
+                                var tdCek = document.createElement('td');
+                                tdCek.className = 'text-center';
+                                var cb = document.createElement('input');
+                                cb.type = 'checkbox';
+                                cb.className = 'form-check-input spp-cek';
+                                cb.name = 'bulan[]';
+                                cb.value = b.id;
+                                cb.addEventListener('change', hitung);
+                                tdCek.appendChild(cb);
+
+                                var tdLabel = document.createElement('td');
+                                tdLabel.className = 'small text-nowrap';
+                                tdLabel.textContent = b.label;
+
+                                var tdTotal = document.createElement('td');
+                                tdTotal.className = 'text-end small text-nowrap';
+                                tdTotal.textContent = rupiah(b.total);
+
+                                var tdBayar = document.createElement('td');
+                                tdBayar.className = 'text-end small text-nowrap text-success';
+                                tdBayar.textContent = rupiah(b.bayar);
+
+                                var tdSisa = document.createElement('td');
+                                tdSisa.className = 'text-end small text-nowrap text-danger';
+                                tdSisa.textContent = rupiah(b.sisa);
+
+                                var tdNom = document.createElement('td');
+                                tdNom.className = 'text-end';
+                                var inp = document.createElement('input');
+                                inp.type = 'number';
+                                inp.className = 'form-control form-control-sm text-end spp-nominal';
+                                inp.name = 'nominal[' + b.id + ']';
+                                inp.value = Math.round(b.sisa);
+                                inp.min = 1;
+                                inp.max = Math.round(b.sisa);
+                                inp.step = 1000;
+                                inp.disabled = true;
+                                inp.addEventListener('input', hitung);
+                                tdNom.appendChild(inp);
+
+                                tr.appendChild(tdCek);
+                                tr.appendChild(tdLabel);
+                                tr.appendChild(tdTotal);
+                                tr.appendChild(tdBayar);
+                                tr.appendChild(tdSisa);
+                                tr.appendChild(tdNom);
+                                return tr;
+                            }
+
+                            modalEl.addEventListener('show.bs.modal', function (ev) {
+                                var btn = ev.relatedTarget;
+                                var id = btn ? btn.getAttribute('data-siswa') : '';
+                                var d = DATA[id];
+                                if (!d) { return; }
+                                idEl.value = d.id;
+                                namaEl.textContent = d.nama;
+                                nisEl.textContent = d.nipd;
+                                body.innerHTML = '';
+                                d.bulan.forEach(function (b) { body.appendChild(buatBaris(b)); });
+                                semuaEl.checked = false;
+                                hitung();
+                            });
+
+                            if (semuaEl) {
+                                semuaEl.addEventListener('change', function () {
+                                    body.querySelectorAll('.spp-cek').forEach(function (cb) {
+                                        cb.checked = semuaEl.checked;
+                                    });
+                                    hitung();
+                                });
+                            }
+
+                            form.addEventListener('submit', function (ev) {
+                                if (body.querySelectorAll('.spp-cek:checked').length === 0) {
+                                    ev.preventDefault();
+                                    alert('Pilih minimal satu bulan yang akan dibayar.');
+                                }
+                            });
+                        })();
+                    </script>
+                <?php endif; ?>
+            <?php endif; ?>
+
             <!-- ================= HASIL PENCARIAN ================= -->
-            <?php if ($id_tagihan <= 0 && ($f_q !== '' || $id_siswa_cari > 0)): ?>
+            <?php if ($id_tagihan <= 0 && $f_kelas <= 0 && ($f_q !== '' || $id_siswa_cari > 0)): ?>
                 <?php if (empty($hasil_siswa)): ?>
                     <div class="alert alert-warning"><i class="bi bi-search me-1"></i>Tidak ada siswa yang cocok dengan pencarian.</div>
                 <?php else: ?>
