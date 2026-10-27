@@ -121,11 +121,13 @@ foreach ($rows as $r) {
             'total' => 0.0,
             'bayar' => 0.0,
             'belum' => [],
+            'rincian' => [],
         ];
     }
     $per_siswa[$id_s]['bulan']++;
     $per_siswa[$id_s]['total'] += $total;
     $per_siswa[$id_s]['bayar'] += $bayar;
+    $per_siswa[$id_s]['rincian'][$key] = ['total' => $total, 'bayar' => $bayar];
     if ($total - $bayar > 0.005) {
         $per_siswa[$id_s]['belum'][] = spp_bulan_label((int)$r['tahun'], (int)$r['bulan']);
     }
@@ -176,6 +178,18 @@ $kepala = laporan_kepala_sekolah($koneksi);
 $footer_html = laporan_footer_html($kepala);
 ?>
 <?= laporan_print_css(); ?>
+<style id="spp-rekap-css">
+    .spp-matriks-tunggakan td, .spp-matriks-tunggakan th { padding: 2px 3px; }
+    .spp-matriks-tunggakan thead th { font-size: .78rem; }
+    @media print {
+        .spp-matriks-tunggakan { font-size: 7pt; table-layout: fixed; width: 100%; }
+        .spp-matriks-tunggakan th, .spp-matriks-tunggakan td { padding: 1px 2px !important; line-height: 1.15; }
+        .spp-matriks-tunggakan thead th { font-size: 6.8pt; }
+        .spp-matriks-tunggakan tbody td { font-size: 6.8pt; }
+        .spp-matriks-tunggakan tr { page-break-inside: avoid; break-inside: avoid; }
+        .spp-matriks-tunggakan thead { display: table-header-group; }
+    }
+</style>
 <main class="app-main">
     <div class="app-content-header no-print">
         <div class="container-fluid">
@@ -448,6 +462,104 @@ $footer_html = laporan_footer_html($kepala);
                                 <?php endif; ?>
                             </tbody>
                         </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ================= RINCIAN 12 BULAN (SIAPA MENUNGGAK / SUDAH LUNAS) ================= -->
+            <?php
+            $periode_label = '';
+            if (!empty($periode)) {
+                $awal = $periode[0];
+                $akhir = $periode[count($periode) - 1];
+                $periode_label = $awal['label'] . ' – ' . $akhir['label'];
+            }
+            $kolom_total = 3 + count($periode) + 1; // No + Nama + bulan + Lunas + Tunggakan
+            ?>
+            <div class="card card-outline card-danger mb-3">
+                <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+                    <div>
+                        <h5 class="mb-0"><i class="bi bi-grid-3x3-gap me-1 text-danger"></i> Rincian Tunggakan per Bulan (12 Bulan)</h5>
+                        <div class="small text-muted">
+                            Periode <?= htmlspecialchars($periode_label); ?> &middot; <?= htmlspecialchars($label_kelas); ?>
+                            &middot; hanya siswa yang masih menunggak
+                        </div>
+                    </div>
+                    <span class="badge bg-danger"><?= (int)$jumlah_menunggak; ?> siswa</span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-bordered align-middle mb-0 spp-matriks-tunggakan" id="tblTunggakanBulan">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="text-center" style="width:30px">No</th>
+                                    <th style="min-width:150px">Nama Siswa</th>
+                                    <?php foreach ($periode as $p): ?>
+                                        <th class="text-center" style="width:32px" title="<?= htmlspecialchars($p['label']); ?>">
+                                            <?= htmlspecialchars(spp_bulan_singkat((int)$p['bulan'])); ?>
+                                            <div class="fw-normal text-muted" style="font-size:.6rem;line-height:1"><?= substr((string)$p['tahun'], 2); ?></div>
+                                        </th>
+                                    <?php endforeach; ?>
+                                    <th class="text-center" style="width:44px" title="Jumlah bulan lunas">Lunas</th>
+                                    <th class="text-end" style="width:82px">Tunggakan</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php if (empty($tunggakan_list)): ?>
+                                    <tr>
+                                        <td colspan="<?= (int)$kolom_total; ?>" class="text-center text-muted py-3">
+                                            <i class="bi bi-check2-circle me-1 text-success"></i>Tidak ada tunggakan pada filter ini.
+                                        </td>
+                                    </tr>
+                                <?php else: ?>
+                                    <?php foreach ($tunggakan_list as $i => $t): ?>
+                                        <?php $lunas_n = 0; ?>
+                                        <tr>
+                                            <td class="text-center small"><?= $i + 1; ?></td>
+                                            <td class="small">
+                                                <span class="fw-semibold"><?= htmlspecialchars($t['nama']); ?></span>
+                                                <span class="text-muted"> &middot; <?= htmlspecialchars($t['nipd']); ?></span>
+                                                <?php if (trim((string)$t['kelas']) !== ''): ?>
+                                                    <span class="text-muted d-none d-print-inline"> &middot; <?= htmlspecialchars($t['kelas']); ?></span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <?php foreach ($periode as $p):
+                                                $key = sprintf('%04d-%02d', (int)$p['tahun'], (int)$p['bulan']);
+                                                $rr = $t['rincian'][$key] ?? null;
+                                                if (!$rr) {
+                                                    echo '<td class="text-center text-muted" title="Belum digenerate">&ndash;</td>';
+                                                    continue;
+                                                }
+                                                $sisa_m = (float)$rr['total'] - (float)$rr['bayar'];
+                                                if ($sisa_m <= 0.005) {
+                                                    $lunas_n++;
+                                                    $cls = 'table-success';
+                                                    $txt = 'L';
+                                                    $tip = 'Lunas';
+                                                } elseif ((float)$rr['bayar'] > 0) {
+                                                    $cls = 'table-warning';
+                                                    $txt = 'S';
+                                                    $tip = 'Sebagian, sisa ' . spp_rupiah($sisa_m);
+                                                } else {
+                                                    $cls = 'table-danger';
+                                                    $txt = 'B';
+                                                    $tip = 'Menunggak ' . spp_rupiah($sisa_m);
+                                                }
+                                                echo '<td class="text-center small ' . $cls . '" title="' . htmlspecialchars($p['label'] . ' — ' . $tip) . '">' . $txt . '</td>';
+                                            endforeach; ?>
+                                            <td class="text-center small"><?= $lunas_n; ?>/<?= count($periode); ?></td>
+                                            <td class="text-end small fw-semibold text-danger"><?= spp_rupiah($t['sisa']); ?></td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="small text-muted px-2 py-2">
+                        <span class="badge bg-success">L</span> Lunas &middot;
+                        <span class="badge bg-warning text-dark">S</span> Sebagian / angsuran &middot;
+                        <span class="badge bg-danger">B</span> Belum dibayar (menunggak) &middot;
+                        <span class="text-muted">&ndash;</span> tagihan belum digenerate.
                     </div>
                 </div>
             </div>
