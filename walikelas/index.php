@@ -24,6 +24,7 @@ $kelas_label = $info_kelas ? wk_kelas_label(['tingkat' => $info_kelas['tingkat']
 
 $judul = 'Dashboard Wali Kelas';
 $active = 'beranda';
+$wk_leaflet = true;
 require __DIR__ . '/_header.php';
 
 if (empty($kelas_wali)) {
@@ -76,6 +77,9 @@ $jml_hari_efektif = count($hari_efektif);
 // ---- Roster & absensi ----
 $roster = wk_siswa_kelas($koneksi, $id_kelas, $id_ta);
 $total_siswa = count($roster);
+
+// ---- Sebaran lokasi siswa (peta) ----
+$peta = $id_kelas > 0 ? wk_titik_siswa($koneksi, $id_kelas, $id_ta) : ['titik' => [], 'invalid' => 0, 'kec' => [], 'center' => [-8.6258946, 115.1775938]];
 
 $abs_month = [];
 $abs_siswa = [];
@@ -384,6 +388,37 @@ $abs_warna = ['H' => 'success', 'S' => 'info', 'I' => 'warning', 'A' => 'danger'
 </div>
 
 <div class="card wk-card mb-2">
+    <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center gap-2">
+        <span class="fw-semibold" style="font-size:.88rem;"><i class="bi bi-geo-alt text-danger me-1"></i>Sebaran Lokasi Siswa</span>
+        <span class="badge bg-success-subtle text-success" style="font-size:.68rem;"><?= count($peta['titik']); ?> titik</span>
+    </div>
+    <div class="card-body py-2">
+        <?php if ($total_siswa === 0): ?>
+            <div class="text-muted small text-center py-3">Belum ada siswa pada kelas ini.</div>
+        <?php else: ?>
+            <div id="mapWaliKelas" class="wk-map border"></div>
+            <div class="d-flex justify-content-between small text-muted mt-2">
+                <span><i class="bi bi-people me-1"></i><?= $total_siswa; ?> siswa</span>
+                <span><i class="bi bi-pin-map me-1"></i><?= count($peta['titik']); ?> terpetakan</span>
+                <?php if ($peta['invalid'] > 0): ?>
+                    <span class="text-warning"><i class="bi bi-exclamation-triangle me-1"></i><?= (int)$peta['invalid']; ?> belum ada koordinat</span>
+                <?php endif; ?>
+            </div>
+            <?php if (!empty($peta['kec'])): ?>
+                <hr class="my-2">
+                <div class="small text-uppercase text-muted fw-semibold mb-1" style="font-size:.68rem;">Kecamatan terbanyak</div>
+                <?php $kec_no = 0; foreach ($peta['kec'] as $nama_kec => $jml): if ($kec_no >= 3) break; $kec_no++; ?>
+                    <div class="d-flex justify-content-between small">
+                        <span class="text-truncate me-2"><?= wk_esc($nama_kec); ?></span>
+                        <b class="text-nowrap"><?= (int)$jml; ?> siswa</b>
+                    </div>
+                <?php endforeach; ?>
+            <?php endif; ?>
+        <?php endif; ?>
+    </div>
+</div>
+
+<div class="card wk-card mb-2">
     <div class="card-header bg-white py-2 fw-semibold" style="font-size:.88rem;">
         <i class="bi bi-person-check text-success me-1"></i>Siswa Tidak Hadir
         <span class="text-muted fw-normal">(<?= $tgl_tampil ? date('d/m/Y', strtotime($tgl_tampil)) : '-'; ?>)</span>
@@ -509,6 +544,59 @@ $abs_warna = ['H' => 'success', 'S' => 'info', 'I' => 'warning', 'A' => 'danger'
             scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } } }
         }
     });
+})();
+</script>
+<?php endif; ?>
+
+<?php if ($total_siswa > 0): ?>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script>
+(function () {
+    var el = document.getElementById('mapWaliKelas');
+    if (!el || typeof L === 'undefined') return;
+
+    function esc(t) {
+        var d = document.createElement('div');
+        d.textContent = (t === null || t === undefined) ? '' : String(t);
+        return d.innerHTML;
+    }
+
+    var data = <?= json_encode($peta['titik']); ?>;
+    if (!data.length) {
+        el.innerHTML = '<div class="h-100 d-flex align-items-center justify-content-center p-3 text-center text-muted small">Belum ada siswa dengan koordinat valid pada kelas ini.</div>';
+        return;
+    }
+
+    var map = L.map(el, { scrollWheelZoom: false }).setView([<?= $peta['center'][0]; ?>, <?= $peta['center'][1]; ?>], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        maxZoom: 19
+    }).addTo(map);
+
+    var markers = (typeof L.markerClusterGroup === 'function')
+        ? L.markerClusterGroup({ showCoverageOnHover: false, maxClusterRadius: 45 })
+        : L.featureGroup();
+
+    data.forEach(function (s) {
+        var popup = '<b>' + esc(s.nama || '-') + '</b><br>'
+            + 'NIS: ' + esc(s.nis || '-') + '<br>'
+            + 'Kecamatan: ' + esc(s.kec || '-');
+        var marker = L.marker([s.lat, s.lng])
+            .bindTooltip(esc(s.nama || '-'), { direction: 'top', sticky: true })
+            .bindPopup(popup);
+        if (typeof markers.addLayer === 'function') {
+            markers.addLayer(marker);
+        } else {
+            marker.addTo(map);
+        }
+    });
+
+    if (typeof markers.addTo === 'function') markers.addTo(map);
+    if (data.length > 1 && typeof markers.getBounds === 'function') {
+        map.fitBounds(markers.getBounds().pad(0.25));
+    }
+    setTimeout(function () { map.invalidateSize(); }, 250);
 })();
 </script>
 <?php endif; ?>

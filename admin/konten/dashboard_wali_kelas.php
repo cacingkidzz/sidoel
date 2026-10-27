@@ -191,6 +191,58 @@ if ($id_kelas > 0 && $id_ta > 0) {
 }
 $total_siswa = count($roster);
 
+// ==========================================================
+// SEBARAN LOKASI SISWA (peta + ringkasan per kecamatan)
+// Koordinat dt_siswa.lintang/bujur bertipe varchar dan sebagian memakai
+// koma desimal (mis. "-8,68114"), jadi perlu dinormalkan sebelum dipakai.
+// ==========================================================
+if (!function_exists('normalisasi_koordinat')) {
+    function normalisasi_koordinat($nilai)
+    {
+        if ($nilai === null) return null;
+        $v = trim((string)$nilai);
+        if ($v === '') return null;
+        $v = str_replace(',', '.', $v);
+        if (!is_numeric($v)) return null;
+        return (float)$v;
+    }
+}
+
+$titik_siswa   = [];
+$titik_invalid = 0;
+$kec_sebaran   = [];
+foreach ($roster as $sw) {
+    $kec = trim((string)($sw['kecamatan'] ?? ''));
+    if ($kec === '' || $kec === '0') $kec = '(belum diisi)';
+    $kec_sebaran[$kec] = ($kec_sebaran[$kec] ?? 0) + 1;
+
+    $lat = normalisasi_koordinat($sw['lintang'] ?? null);
+    $lng = normalisasi_koordinat($sw['bujur'] ?? null);
+    if ($lat === null || $lng === null) { $titik_invalid++; continue; }
+
+    // Semua siswa di Bali (belahan selatan); lintang positif = salah tanda.
+    if ($lat > 0 && $lat <= 90) $lat = -$lat;
+
+    // Buang outlier di luar wilayah Bali (mis. (0,0), (1,1), luar pulau).
+    if ($lat < -9.5 || $lat > -7.0 || $lng < 114.0 || $lng > 116.5) { $titik_invalid++; continue; }
+
+    $titik_siswa[] = [
+        'lat' => $lat,
+        'lng' => $lng,
+        'nama' => (string)($sw['nama'] ?? ''),
+        'nis' => (string)($sw['nipd'] ?? ''),
+        'kec' => $kec,
+    ];
+}
+$titik_valid = count($titik_siswa);
+arsort($kec_sebaran);
+$center_lat = -8.6258946;
+$center_lng = 115.1775938;
+if ($titik_valid > 0) {
+    $center_lat = round(array_sum(array_column($titik_siswa, 'lat')) / $titik_valid, 6);
+    $center_lng = round(array_sum(array_column($titik_siswa, 'lng')) / $titik_valid, 6);
+}
+
 // ---- Kelengkapan data wajib per siswa ----
 $kel_map = [];
 $sum_kel_pct = 0.0;
@@ -896,6 +948,80 @@ $abs_label = ['H' => 'Hadir', 'S' => 'Sakit', 'I' => 'Izin', 'A' => 'Alpa'];
             </div>
         </div>
 
+        <style>
+            #mapWaliKelas { height: 380px; width: 100%; z-index: 1; }
+            @media (max-width: 767.98px) { #mapWaliKelas { height: 300px; } }
+            .wk-map-empty { display: flex; align-items: center; justify-content: center; height: 100%; text-align: center; }
+        </style>
+
+        <div class="row g-3 mt-0">
+            <div class="col-12">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-white fw-semibold d-flex flex-wrap justify-content-between align-items-center gap-2">
+                        <span><i class="bi bi-geo-alt me-1 text-danger"></i> Sebaran Lokasi Siswa</span>
+                        <span class="small fw-normal d-flex flex-wrap align-items-center gap-2">
+                            <span class="badge bg-success-subtle text-success"><i class="bi bi-pin-map me-1"></i><?= $titik_valid; ?> titik terpetakan</span>
+                            <?php if ($titik_invalid > 0) : ?>
+                                <span class="badge bg-warning-subtle text-warning"><i class="bi bi-exclamation-triangle me-1"></i><?= $titik_invalid; ?> belum ada koordinat valid</span>
+                            <?php endif; ?>
+                            <?php if (boleh_menu($level_user, 'denah_siswa')) : ?>
+                                <a href="index.php?menu=denah_siswa" class="text-decoration-none">Peta semua siswa <i class="bi bi-box-arrow-up-right"></i></a>
+                            <?php endif; ?>
+                        </span>
+                    </div>
+                    <div class="card-body">
+                        <?php if ($total_siswa === 0) : ?>
+                            <div class="text-muted small"><i class="bi bi-inbox me-1"></i> Belum ada siswa pada kelas ini.</div>
+                        <?php else : ?>
+                            <div class="row g-3">
+                                <div class="col-12 col-xl-8">
+                                    <div id="mapWaliKelas" class="rounded border overflow-hidden"></div>
+                                    <div class="small text-muted mt-2">
+                                        <i class="bi bi-info-circle me-1"></i> Klik penanda untuk melihat nama, NIS, dan kecamatan siswa. Titik yang tidak valid tidak ditampilkan.
+                                    </div>
+                                </div>
+                                <div class="col-12 col-xl-4">
+                                    <div class="small text-uppercase text-muted fw-semibold mb-2">Sebaran per Kecamatan</div>
+                                    <?php if (empty($kec_sebaran)) : ?>
+                                        <div class="text-muted small">Belum ada data kecamatan.</div>
+                                    <?php else : ?>
+                                        <?php $kec_tampil = 0; $kec_sisa = 0; ?>
+                                        <?php foreach ($kec_sebaran as $nama_kec => $jml) : ?>
+                                            <?php if ($kec_tampil < 8) : ?>
+                                                <div class="mb-2">
+                                                    <div class="d-flex justify-content-between small">
+                                                        <span class="text-truncate me-2"><?= htmlspecialchars($nama_kec); ?></span>
+                                                        <b class="text-nowrap"><?= (int)$jml; ?> siswa</b>
+                                                    </div>
+                                                    <div class="progress" style="height:6px;">
+                                                        <div class="progress-bar bg-danger" style="width:<?= $total_siswa > 0 ? round($jml * 100 / $total_siswa) : 0; ?>%"></div>
+                                                    </div>
+                                                </div>
+                                                <?php $kec_tampil++; ?>
+                                            <?php else : ?>
+                                                <?php $kec_sisa += $jml; ?>
+                                            <?php endif; ?>
+                                        <?php endforeach; ?>
+                                        <?php if ($kec_sisa > 0) : ?>
+                                            <div class="small text-muted mt-1">+ <?= $kec_sisa; ?> siswa pada kecamatan lain.</div>
+                                        <?php endif; ?>
+                                        <hr class="my-2">
+                                        <div class="d-flex justify-content-between small">
+                                            <span class="text-muted">Total siswa kelas</span><b><?= $total_siswa; ?> siswa</b>
+                                        </div>
+                                        <div class="d-flex justify-content-between small">
+                                            <span class="text-muted">Sudah ada koordinat</span>
+                                            <b class="text-<?= $titik_valid > 0 ? 'success' : 'secondary'; ?>"><?= $total_siswa > 0 ? round($titik_valid * 100 / $total_siswa) : 0; ?>%</b>
+                                        </div>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="row g-3 mt-0">
             <div class="col-12">
                 <div class="card border-0 shadow-sm">
@@ -1003,5 +1129,57 @@ $abs_label = ['H' => 'Hadir', 'S' => 'Sakit', 'I' => 'Izin', 'A' => 'Alpa'];
         }
     });
 })();
+</script>
+<?php endif; ?>
+
+<?php if ($id_kelas > 0 && $total_siswa > 0) : ?>
+<script>
+window.addEventListener('load', function () {
+    var el = document.getElementById('mapWaliKelas');
+    if (!el || typeof L === 'undefined') return;
+
+    function esc(t) {
+        var d = document.createElement('div');
+        d.textContent = (t === null || t === undefined) ? '' : String(t);
+        return d.innerHTML;
+    }
+
+    var data = <?= json_encode($titik_siswa); ?>;
+    if (!data.length) {
+        el.innerHTML = '<div class="wk-map-empty p-3"><div class="text-muted small"><i class="bi bi-pin-map fs-4 d-block mb-2"></i>Belum ada siswa dengan koordinat valid pada kelas ini. Lengkapi titik lokasi lewat menu Edit Data siswa.</div></div>';
+        return;
+    }
+
+    var map = L.map(el).setView([<?= $center_lat; ?>, <?= $center_lng; ?>], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        maxZoom: 19
+    }).addTo(map);
+
+    var markers = (typeof L.markerClusterGroup === 'function')
+        ? L.markerClusterGroup({ showCoverageOnHover: false, maxClusterRadius: 50 })
+        : L.featureGroup();
+
+    data.forEach(function (s) {
+        var popup = '<b>' + esc(s.nama || '(tanpa nama)') + '</b><br>'
+            + 'NIS: ' + esc(s.nis || '-') + '<br>'
+            + 'Kecamatan: ' + esc(s.kec || '-') + '<br>'
+            + '<small>Lat/Lng: ' + esc(s.lat) + ', ' + esc(s.lng) + '</small>';
+        var marker = L.marker([s.lat, s.lng])
+            .bindTooltip(esc(s.nama || '(tanpa nama)'), { direction: 'top', sticky: true })
+            .bindPopup(popup);
+        if (typeof markers.addLayer === 'function') {
+            markers.addLayer(marker);
+        } else {
+            marker.addTo(map);
+        }
+    });
+
+    if (typeof markers.addTo === 'function') markers.addTo(map);
+    if (data.length > 1 && typeof markers.getBounds === 'function') {
+        map.fitBounds(markers.getBounds().pad(0.25));
+    }
+    setTimeout(function () { map.invalidateSize(); }, 250);
+});
 </script>
 <?php endif; ?>

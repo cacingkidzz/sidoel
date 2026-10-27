@@ -1,7 +1,7 @@
 <?php
 /**
- * Jurnal Kelas (admin) — browse isi jurnal mengajar per kelas (KBM-3).
- * Filter: ?kelas=<id_kelas>&bulan=YYYY-MM (bulan opsional; kosong = semua).
+ * Jurnal Kelas (admin) — browse isi jurnal mengajar per kelas per bulan (KBM-3).
+ * Filter: ?kelas=<id_kelas>&bulan=YYYY-MM (default bulan berjalan).
  * Read-only. Detail absensi per sesi lewat modal.
  */
 include('koneksi.php');
@@ -54,18 +54,14 @@ foreach ($kelas_list as $kls) {
 }
 if (!$kelas_valid) $id_kelas = $kelas_list ? (int)$kelas_list[0]['id_kelas'] : 0;
 
-// ---- Bulan (opsional) ----
+// ---- Bulan (wajib; default bulan berjalan) ----
 $nama_bulan = ['01'=>'Januari','02'=>'Februari','03'=>'Maret','04'=>'April','05'=>'Mei','06'=>'Juni','07'=>'Juli','08'=>'Agustus','09'=>'September','10'=>'Oktober','11'=>'November','12'=>'Desember'];
 $bulan = (string)($_GET['bulan'] ?? '');
-if ($bulan !== '' && !preg_match('/^\d{4}-\d{2}$/', $bulan)) $bulan = '';
-$awal = $akhir = null;
-$label_bulan = 'Semua periode';
-if ($bulan !== '') {
-    $awal = $bulan . '-01';
-    $akhir = date('Y-m-t', strtotime($awal));
-    $label_bulan = ($nama_bulan[substr($bulan, 5, 2)] ?? '') . ' ' . substr($bulan, 0, 4);
-}
-$libur_map = ($awal !== null) ? laporan_hari_libur($koneksi ?? null, $id_ta_aktif, $awal, $akhir) : [];
+if (!preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $bulan)) $bulan = date('Y-m');
+$awal = $bulan . '-01';
+$akhir = date('Y-m-t', strtotime($awal));
+$label_bulan = ($nama_bulan[substr($bulan, 5, 2)] ?? '') . ' ' . substr($bulan, 0, 4);
+$libur_map = laporan_hari_libur($koneksi ?? null, $id_ta_aktif, $awal, $akhir);
 
 // ---- Info kelas + wali ----
 $info_kelas = ['nama_kelas' => '-', 'tingkat' => '', 'jurusan' => '', 'wali' => ''];
@@ -103,13 +99,10 @@ if ($id_kelas > 0 && $id_ta_aktif > 0) {
             LEFT JOIN dt_guru gp ON gp.id_guru = j.id_guru_pengganti
             LEFT JOIN dt_siswa s ON s.id_siswa = j.dicatat_oleh
             LEFT JOIN dt_jam_pelajaran jp ON jp.jam_ke = j.jam_ke
-            WHERE j.id_kelas = ? AND j.id_tahun_ajaran = ?";
-    $params = [$id_kelas, $id_ta_aktif];
-    $types = "ii";
-    if ($awal !== null) {
-        $sql .= " AND j.tanggal BETWEEN ? AND ?";
-        $params[] = $awal; $params[] = $akhir; $types .= "ss";
-    }
+            WHERE j.id_kelas = ? AND j.id_tahun_ajaran = ?
+              AND j.tanggal BETWEEN ? AND ?";
+    $params = [$id_kelas, $id_ta_aktif, $awal, $akhir];
+    $types = "iiss";
     $sql .= " ORDER BY j.tanggal DESC, j.jam_ke ASC";
     $stmt = $koneksi->prepare($sql);
     $stmt->bind_param($types, ...$params);
@@ -198,11 +191,8 @@ foreach ($jurnal_rows as $r) {
                             </select>
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label fw-bold mb-1">Bulan (opsional)</label>
-                            <div class="input-group">
-                                <input type="month" name="bulan" class="form-control" value="<?= htmlspecialchars($bulan); ?>">
-                                <a class="btn btn-outline-secondary" href="?menu=jurnal_kelas&kelas=<?= (int)$id_kelas; ?>" title="Reset bulan"><i class="bi bi-x-lg"></i></a>
-                            </div>
+                            <label class="form-label fw-bold mb-1">Bulan</label>
+                            <input type="month" name="bulan" class="form-control" value="<?= htmlspecialchars($bulan); ?>" required>
                         </div>
                         <div class="col-md-5 d-flex gap-2">
                             <button type="submit" class="btn btn-primary"><i class="bi bi-funnel me-1"></i> Tampilkan</button>
@@ -218,7 +208,7 @@ foreach ($jurnal_rows as $r) {
 
                 <?php if ($libur_map): ?>
                     <div class="alert alert-danger py-2 no-print">
-                        <i class="bi bi-cup-hot me-1"></i> Hari libur pada periode ini <b>tidak dihitung</b> sebagai sesi (baris bertanda merah tetap ditampilkan bila ada data):
+                        <i class="bi bi-cup-hot me-1"></i> Hari libur pada bulan ini <b>tidak dihitung</b> sebagai sesi (baris bertanda merah tetap ditampilkan bila ada data):
                         <b><?= htmlspecialchars(laporan_libur_ringkas($libur_map)); ?></b>
                     </div>
                 <?php endif; ?>
@@ -265,7 +255,7 @@ foreach ($jurnal_rows as $r) {
                                 </thead>
                                 <tbody>
                                     <?php if (!$jurnal_rows): ?>
-                                        <tr><td colspan="9" class="text-center text-muted py-3">Belum ada jurnal pada kelas/periode ini.</td></tr>
+                                        <tr><td colspan="9" class="text-center text-muted py-3">Belum ada jurnal pada kelas/bulan ini.</td></tr>
                                     <?php else: ?>
                                         <?php foreach ($jurnal_rows as $i => $r):
                                             $tgl = $r['tanggal'];

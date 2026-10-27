@@ -163,3 +163,62 @@ function wk_kelas_label(array $k): string
     if (!empty($k['nama_jurusan'])) $label .= ' (' . $k['nama_jurusan'] . ')';
     return $label !== '' ? $label : ('Kelas #' . (int)($k['id_kelas'] ?? 0));
 }
+
+/**
+ * Sebaran lokasi siswa satu kelas (untuk peta Leaflet).
+ *
+ * dt_siswa.lintang/bujur bertipe varchar dan sebagian memakai koma desimal
+ * (mis. "-8,68114"), jadi dinormalkan dulu. Titik di luar wilayah Bali
+ * (mis. (0,0) atau (1,1)) dianggap tidak valid agar peta tidak melebar.
+ *
+ * @return array{titik: array<int,array>, invalid: int, kec: array<string,int>, center: array{0:float,1:float}}
+ */
+function wk_titik_siswa($koneksi, int $id_kelas, int $id_ta): array
+{
+    $out = ['titik' => [], 'invalid' => 0, 'kec' => [], 'center' => [-8.6258946, 115.1775938]];
+    $stmt = $koneksi->prepare("SELECT s.nama, s.nipd, s.lintang, s.bujur, s.kecamatan
+                               FROM dt_kelas_siswa ks
+                               INNER JOIN dt_siswa s ON s.id_siswa = ks.id_siswa
+                               WHERE ks.id_kelas = ? AND ks.id_tahun_ajaran = ?
+                               ORDER BY s.nama ASC");
+    if (!$stmt) return $out;
+    $stmt->bind_param('ii', $id_kelas, $id_ta);
+    $stmt->execute();
+    $res = $stmt->get_result();
+    while ($r = $res->fetch_assoc()) {
+        $kec = trim((string)($r['kecamatan'] ?? ''));
+        if ($kec === '' || $kec === '0') $kec = '(belum diisi)';
+        $out['kec'][$kec] = ($out['kec'][$kec] ?? 0) + 1;
+
+        $lat = trim((string)($r['lintang'] ?? ''));
+        $lng = trim((string)($r['bujur'] ?? ''));
+        $lat = $lat === '' ? null : (is_numeric(str_replace(',', '.', $lat)) ? (float)str_replace(',', '.', $lat) : null);
+        $lng = $lng === '' ? null : (is_numeric(str_replace(',', '.', $lng)) ? (float)str_replace(',', '.', $lng) : null);
+        if ($lat === null || $lng === null) { $out['invalid']++; continue; }
+
+        // Seluruh siswa di Bali (belahan selatan): lintang positif = salah tanda.
+        if ($lat > 0 && $lat <= 90) $lat = -$lat;
+
+        // Buang outlier di luar wilayah Bali.
+        if ($lat < -9.5 || $lat > -7.0 || $lng < 114.0 || $lng > 116.5) { $out['invalid']++; continue; }
+
+        $out['titik'][] = [
+            'lat' => $lat,
+            'lng' => $lng,
+            'nama' => (string)($r['nama'] ?? ''),
+            'nis' => (string)($r['nipd'] ?? ''),
+            'kec' => $kec,
+        ];
+    }
+    $stmt->close();
+
+    $n = count($out['titik']);
+    if ($n > 0) {
+        $out['center'] = [
+            round(array_sum(array_column($out['titik'], 'lat')) / $n, 6),
+            round(array_sum(array_column($out['titik'], 'lng')) / $n, 6),
+        ];
+    }
+    arsort($out['kec']);
+    return $out;
+}

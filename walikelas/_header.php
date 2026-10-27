@@ -13,6 +13,11 @@ $kelas_label = trim((string)($kelas_label ?? ''));
     <link rel="icon" href="<?= wk_esc(wk_logo_url($profil)) ?>" type="image/x-icon">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css" rel="stylesheet">
+    <?php if (!empty($wk_leaflet)): ?>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+    <?php endif; ?>
     <style>
         :root { --wk-primary: #0f766e; }
         body { background: #f4f6f8; padding-bottom: 76px; -webkit-tap-highlight-color: transparent; }
@@ -35,6 +40,7 @@ $kelas_label = trim((string)($kelas_label ?? ''));
         .wk-bottomnav a { flex: 1; text-align: center; color: #8a93a6; text-decoration: none; font-size: .72rem; }
         .wk-bottomnav a i { display: block; font-size: 1.25rem; }
         .wk-bottomnav a.active { color: var(--wk-primary); font-weight: 600; }
+        .wk-map { height: 260px; width: 100%; border-radius: .7rem; overflow: hidden; z-index: 1; }
     </style>
 </head>
 <body>
