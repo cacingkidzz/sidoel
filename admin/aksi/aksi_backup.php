@@ -43,9 +43,11 @@ if ($aksi === 'download') {
 if ($aksi === 'buat') {
     $name = 'db_' . date('Ymd_His') . '.sql';
     $path = backup_dir() . DIRECTORY_SEPARATOR . $name;
-    list($ok, $out) = backup_dump($path, $cfg_host, $cfg_user, $cfg_pass, $cfg_db);
+    list($ok, $out) = backup_dump($path, $cfg_host, $cfg_user, $cfg_pass, $cfg_db, $koneksi);
     if ($ok) {
-        backup_redirect('success', 'Backup berhasil dibuat: <b>' . htmlspecialchars($name) . '</b> (' . backup_size_human(filesize($path)) . ').');
+        $ket = trim($out) !== '' && $out !== 'OK' ? ' — ' . htmlspecialchars($out) : '';
+        backup_redirect('success', 'Backup berhasil dibuat: <b>' . htmlspecialchars($name) . '</b> (' . backup_size_human(filesize($path)) . ')'
+            . ' via <b>' . htmlspecialchars(backup_mode_label()) . '</b>' . $ket . '.');
     }
     @unlink($path);
     backup_redirect('danger', 'Backup <b>gagal</b>. ' . htmlspecialchars(trim($out)));
@@ -58,7 +60,7 @@ if ($aksi === 'restore_file') {
     if (!$path || !is_file($path)) {
         backup_redirect('danger', 'File backup tidak ditemukan.');
     }
-    list($ok, $out) = backup_restore($path, $cfg_host, $cfg_user, $cfg_pass, $cfg_db);
+    list($ok, $out) = backup_restore($path, $cfg_host, $cfg_user, $cfg_pass, $cfg_db, $koneksi);
     if ($ok) {
         backup_redirect('success', 'Database berhasil di-<b>restore</b> dari <b>' . htmlspecialchars($file) . '</b>.');
     }
@@ -82,7 +84,7 @@ if ($aksi === 'restore') {
     if (!@move_uploaded_file($tmp, $path)) {
         backup_redirect('danger', 'Gagal menyimpan file unggahan.');
     }
-    list($ok, $out) = backup_restore($path, $cfg_host, $cfg_user, $cfg_pass, $cfg_db);
+    list($ok, $out) = backup_restore($path, $cfg_host, $cfg_user, $cfg_pass, $cfg_db, $koneksi);
     if ($ok) {
         backup_redirect('success', 'Database berhasil di-<b>restore</b> dari unggahan (' . backup_size_human(filesize($path)) . '). Salinan disimpan sebagai <b>' . htmlspecialchars($name) . '</b>.');
     }

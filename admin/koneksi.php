@@ -18,8 +18,11 @@ if (!defined('GOOGLE_MAPS_API_KEY')) {
 }
 
 // Lokasi binary MySQL (untuk fitur Backup/Restore — Administrasi Sistem).
+// Windows/XAMPP: C:\xampp\mysql\bin. Linux/shared hosting: kosongkan ('') —
+// bila exec() dimatikan atau binary tidak ada, fitur otomatis memakai mode
+// PHP murni (lihat helper_backup.php).
 if (!defined('MYSQL_BIN_DIR')) {
-    define('MYSQL_BIN_DIR', 'C:\\xampp\\mysql\\bin');
+    define('MYSQL_BIN_DIR', DIRECTORY_SEPARATOR === '\\' ? 'C:\\xampp\\mysql\\bin' : '');
 }
 
 // Helper autentikasi password (verifikasi MD5/bcrypt + auto-upgrade).

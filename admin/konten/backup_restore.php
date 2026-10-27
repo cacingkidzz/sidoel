@@ -4,12 +4,14 @@ include("koneksi.php");
 require_once("helper_backup.php");
 
 $tersedia   = backup_available();
+$mode       = backup_mode();
+$mode_label = backup_mode_label();
 $daftar     = backup_list();
 $total_size = 0;
 foreach ($daftar as $d) {
     $total_size += $d['size'];
 }
-$bin_dir = MYSQL_BIN_DIR;
+$bin_dir = backup_bin_dir();
 ?>
 
 <main class="app-main">
@@ -41,8 +43,20 @@ $bin_dir = MYSQL_BIN_DIR;
             <?php if (!$tersedia): ?>
                 <div class="alert alert-danger">
                     <i class="bi bi-exclamation-octagon me-1"></i>
-                    Fitur backup/restore <b>tidak tersedia</b>: fungsi <code>exec()</code> dinonaktifkan atau binary MySQL
-                    (<code>mysqldump.exe</code>/<code>mysql.exe</code>) tidak ditemukan di <code><?= htmlspecialchars($bin_dir) ?></code>.
+                    Fitur backup/restore <b>tidak tersedia</b>: ekstensi <code>mysqli</code> tidak aktif dan binary MySQL
+                    (<code>mysqldump</code>/<code>mysql</code>) juga tidak ditemukan. Hubungi penyedia hosting.
+                </div>
+            <?php elseif ($mode === 'php'): ?>
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle me-1"></i>
+                    Mode <b>PHP murni (fallback)</b> aktif karena fungsi <code>exec()</code> dinonaktifkan atau binary
+                    MySQL tidak tersedia<?= $bin_dir !== '' ? ' di <code>' . htmlspecialchars($bin_dir) . '</code>' : '' ?>.
+                    Backup &amp; restore <b>tetap berjalan</b> lewat PHP/mysqli, dengan catatan:
+                    <ul class="mb-0 mt-1 small">
+                        <li>Struktur + data semua tabel dan view disertakan.</li>
+                        <li><b>Trigger, procedure, function, dan event tidak disertakan</b> (aplikasi ini belum memakainya).</li>
+                        <li>Database besar memerlukan waktu lebih lama — jangan tutup halaman saat proses berjalan.</li>
+                    </ul>
                 </div>
             <?php endif; ?>
 
@@ -70,8 +84,12 @@ $bin_dir = MYSQL_BIN_DIR;
             <div class="row">
                 <div class="col-md-6 mb-3">
                     <div class="card card-outline card-primary h-100">
-                        <div class="card-header">
+                        <div class="card-header d-flex justify-content-between align-items-center">
                             <h5 class="card-title mb-0"><i class="bi bi-download me-1"></i> Buat Backup</h5>
+                            <span class="badge <?= $mode === 'binary' ? 'text-bg-success' : 'text-bg-info' ?>"
+                                  title="Metode yang dipakai untuk membuat/memulihkan backup">
+                                <i class="bi bi-gear-fill me-1"></i><?= htmlspecialchars($mode_label) ?>
+                            </span>
                         </div>
                         <div class="card-body">
                             <p class="text-muted small">
