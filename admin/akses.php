@@ -17,6 +17,7 @@ const AKSES_MENU = [
         'siswa_aktif', 'kelengkapan_siswa', 'siswa_tambah', 'siswa_detail', 'siswa_edit',
         'import_preview', 'penempatan_kelas', 'kenaikan_kelas', 'info_kelas', 'detail_kelas', 'rekap_kelas',
         'denah_siswa', 'alumni', 'tarik_siswa_ppdb', 'foto_siswa', 'kartu_siswa',
+        'spp_tarif', 'spp_tagihan', 'spp_pembayaran', 'spp_rekap',
     ],
     // Kesiswaan: kelas, siswa, PPDB, alumni, penugasan wali/sekretaris, monitoring kelas.
     'Kesiswaan' => [
@@ -26,6 +27,7 @@ const AKSES_MENU = [
         'siswa_aktif', 'kelengkapan_siswa', 'siswa_tambah', 'siswa_detail', 'siswa_edit',
         'import_preview', 'penempatan_kelas', 'kenaikan_kelas', 'info_kelas', 'detail_kelas', 'rekap_kelas',
         'denah_siswa', 'alumni', 'tarik_siswa_ppdb', 'foto_siswa', 'kartu_siswa',
+        'spp_rekap',
     ],
     'Guru' => [
         'beranda', 'dashboard_wali_kelas', 'info_kelas', 'detail_kelas', 'denah_siswa', 'siswa_aktif', 'siswa_detail',
@@ -75,6 +77,9 @@ const AKSES_AKSI_MENU = [
     'aksi_audit.php'        => 'audit_log',
     'aksi_backup.php'       => 'backup_restore',
     'aksi_manajemen_ta.php' => 'manajemen_ta',
+    'aksi_spp_tarif.php'    => 'spp_tarif',
+    'aksi_spp_tagihan.php'  => 'spp_tagihan',
+    'aksi_spp_pembayaran.php' => 'spp_pembayaran',
 ];
 
 if (!function_exists('boleh_menu')) {

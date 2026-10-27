@@ -121,6 +121,20 @@
                     include('konten/kalender_akademik.php');
                     break;
 
+                // --- KEUANGAN (SPP) ---
+                case 'spp_tarif': // (dt_spp_tarif) - Tarif SPP per tingkat x jurusan
+                    include('konten/spp_tarif.php');
+                    break;
+                case 'spp_tagihan': // (dt_spp_tagihan) - Generate & daftar tagihan SPP bulanan
+                    include('konten/spp_tagihan.php');
+                    break;
+                case 'spp_pembayaran': // (dt_spp_pembayaran) - Input pembayaran/cicilan + kwitansi
+                    include('konten/spp_pembayaran.php');
+                    break;
+                case 'spp_rekap': // Rekap penerimaan per bulan/kelas + tunggakan
+                    include('konten/spp_rekap.php');
+                    break;
+
                 // --- ADMINISTRASI SISTEM ---
                 case 'audit_log': // (dt_audit_log) - Log aktivitas pengguna
                     include('konten/audit_log.php');

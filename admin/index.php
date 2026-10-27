@@ -91,6 +91,10 @@ $isKBMActive = in_array($activeMenu, $kbmMenus);
 $laporanMenus = ['kartu_siswa'];
 $isLaporanActive = in_array($activeMenu, $laporanMenus);
 
+// Grup Keuangan (SPP)
+$keuanganMenus = ['spp_tarif', 'spp_tagihan', 'spp_pembayaran', 'spp_rekap'];
+$isKeuanganActive = in_array($activeMenu, $keuanganMenus);
+
 // Grup Administrasi Sistem
 $administrasiMenus = ['user', 'audit_log', 'backup_restore', 'manajemen_ta'];
 $isAdministrasiActive = in_array($activeMenu, $administrasiMenus);
@@ -731,6 +735,47 @@ $isAdministrasiActive = in_array($activeMenu, $administrasiMenus);
                                 class="nav-link <?php echo ($activeMenu == 'jurnal_kelas') ? 'active' : ''; ?>">
                                 <i class="nav-icon bi bi-journal-bookmark"></i>
                                 <p>Jurnal Kelas</p>
+                            </a>
+                        </li>
+                        <?php endif; ?>
+                        <?php endif; ?>
+
+                        <?php if (ada_menu_izin($level_user, $keuanganMenus)): ?>
+                        <li class="nav-header">KEUANGAN (SPP)</li>
+
+                        <?php if (boleh_menu($level_user, 'spp_tarif')): ?>
+                        <li class="nav-item">
+                            <a href="?menu=spp_tarif"
+                                class="nav-link <?php echo ($activeMenu == 'spp_tarif') ? 'active' : ''; ?>">
+                                <i class="nav-icon bi bi-cash-stack"></i>
+                                <p>Tarif SPP</p>
+                            </a>
+                        </li>
+                        <?php endif; ?>
+                        <?php if (boleh_menu($level_user, 'spp_tagihan')): ?>
+                        <li class="nav-item">
+                            <a href="?menu=spp_tagihan"
+                                class="nav-link <?php echo ($activeMenu == 'spp_tagihan') ? 'active' : ''; ?>">
+                                <i class="nav-icon bi bi-receipt"></i>
+                                <p>Tagihan SPP</p>
+                            </a>
+                        </li>
+                        <?php endif; ?>
+                        <?php if (boleh_menu($level_user, 'spp_pembayaran')): ?>
+                        <li class="nav-item">
+                            <a href="?menu=spp_pembayaran"
+                                class="nav-link <?php echo ($activeMenu == 'spp_pembayaran') ? 'active' : ''; ?>">
+                                <i class="nav-icon bi bi-cash-coin"></i>
+                                <p>Pembayaran SPP</p>
+                            </a>
+                        </li>
+                        <?php endif; ?>
+                        <?php if (boleh_menu($level_user, 'spp_rekap')): ?>
+                        <li class="nav-item">
+                            <a href="?menu=spp_rekap"
+                                class="nav-link <?php echo ($activeMenu == 'spp_rekap') ? 'active' : ''; ?>">
+                                <i class="nav-icon bi bi-graph-up-arrow"></i>
+                                <p>Rekap &amp; Tunggakan</p>
                             </a>
                         </li>
                         <?php endif; ?>
