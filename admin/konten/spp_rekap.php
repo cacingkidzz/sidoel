@@ -148,18 +148,71 @@ foreach ($rows as $r) {
     $per_kelas[$id_k]['siswa'][$id_s] = true;
 }
 
-// Urutkan tunggakan terbesar
+// ==========================================================
+// TUNGGAKAN TAHUN AJARAN SEBELUMNYA
+// ==========================================================
+// `dt_spp_tagihan.id_kelas` + `id_tahun_ajaran` adalah snapshot saat generate,
+// jadi tagihan kelas X tidak muncul di rekap TA XI/XII bila hanya difilter TA.
+$kelas_roster = [];
+$id_scope = array_keys($per_siswa);
+if ($f_kelas > 0) {
+    foreach (spp_roster($koneksi, $id_ta, $f_kelas) as $rs) {
+        $id = (int)$rs['id_siswa'];
+        $id_scope[$id] = $id;
+        $kelas_roster[$id] = trim($rs['tingkat'] . ' ' . $rs['nama_kelas']);
+    }
+}
+$lain_ta = ['items' => [], 'siswa' => [], 'total' => 0.0];
+if ($id_ta > 0) {
+    // Tanpa filter kelas = semua siswa (agar tunggakan TA lama tidak terlewat).
+    $lain_ta = spp_tunggakan_lain($koneksi, $id_ta, array_values($id_scope), true, ($f_kelas <= 0));
+}
+$lain_total = (float)$lain_ta['total'];
+$lain_n_total = 0;
+foreach ($lain_ta['siswa'] as $ls) {
+    $lain_n_total += (int)$ls['n'];
+}
+
+// Urutkan tunggakan terbesar (TA ini + TA sebelumnya)
 $tunggakan_list = [];
 foreach ($per_siswa as $id_s => $sw) {
     $sisa = $sw['total'] - $sw['bayar'];
-    if ($sisa > 0.005) {
+    $ls = $lain_ta['siswa'][$id_s] ?? null;
+    $sw['lain_sisa'] = $ls ? (float)$ls['sisa'] : 0.0;
+    $sw['lain_n'] = $ls ? (int)$ls['n'] : 0;
+    if ($sisa > 0.005 || $sw['lain_sisa'] > 0.005) {
         $sw['id_siswa'] = $id_s;
         $sw['sisa'] = $sisa;
         $tunggakan_list[] = $sw;
     }
 }
+
+// Siswa yang hanya punya tunggakan TA sebelumnya (tidak punya tagihan di TA ini).
+foreach ($lain_ta['siswa'] as $id_s => $ls) {
+    if (isset($per_siswa[$id_s])) {
+        continue;
+    }
+    $it = $lain_ta['items'][$id_s][0] ?? null;
+    $tunggakan_list[] = [
+        'id_siswa' => $id_s,
+        'nama' => $it ? (string)$it['nama'] : ('Siswa #' . $id_s),
+        'nipd' => $it ? (string)$it['nipd'] : '',
+        'kelas' => $kelas_roster[$id_s] ?? '',
+        'bulan' => 0,
+        'total' => 0.0,
+        'bayar' => 0.0,
+        'belum' => [],
+        'rincian' => [],
+        'sisa' => 0.0,
+        'lain_sisa' => (float)$ls['sisa'],
+        'lain_n' => (int)$ls['n'],
+    ];
+}
+
 usort($tunggakan_list, function ($a, $b) {
-    return $b['sisa'] <=> $a['sisa'];
+    $ta_s = $a['sisa'] + $a['lain_sisa'];
+    $tb_s = $b['sisa'] + $b['lain_sisa'];
+    return $tb_s <=> $ta_s;
 });
 
 $grand_sisa = max(0, $grand['total'] - $grand['bayar']);
@@ -260,7 +313,7 @@ $footer_html = laporan_footer_html($kepala);
 
             <!-- ================= RINGKASAN ================= -->
             <div class="row g-3 mb-3 no-print">
-                <div class="col-6 col-lg-3">
+                <div class="col-6 col-lg">
                     <div class="card border-0 shadow-sm h-100">
                         <div class="card-body">
                             <div class="small text-muted text-uppercase">Total Tagihan</div>
@@ -269,7 +322,7 @@ $footer_html = laporan_footer_html($kepala);
                         </div>
                     </div>
                 </div>
-                <div class="col-6 col-lg-3">
+                <div class="col-6 col-lg">
                     <div class="card border-0 shadow-sm h-100">
                         <div class="card-body">
                             <div class="small text-muted text-uppercase">Terbayar</div>
@@ -281,7 +334,7 @@ $footer_html = laporan_footer_html($kepala);
                         </div>
                     </div>
                 </div>
-                <div class="col-6 col-lg-3">
+                <div class="col-6 col-lg">
                     <div class="card border-0 shadow-sm h-100">
                         <div class="card-body">
                             <div class="small text-muted text-uppercase">Tunggakan</div>
@@ -290,7 +343,18 @@ $footer_html = laporan_footer_html($kepala);
                         </div>
                     </div>
                 </div>
-                <div class="col-6 col-lg-3">
+                <div class="col-6 col-lg">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-body">
+                            <div class="small text-muted text-uppercase">Tunggakan TA Lalu</div>
+                            <div class="h5 mb-0 fw-bold text-warning-emphasis"><?= spp_rupiah($lain_total); ?></div>
+                            <div class="small text-muted">
+                                <?= count($lain_ta['siswa']); ?> siswa &middot; <?= (int)$lain_n_total; ?> tagihan
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-6 col-lg">
                     <div class="card border-0 shadow-sm h-100">
                         <div class="card-body">
                             <div class="small text-muted text-uppercase">Siswa Menunggak</div>
@@ -420,8 +484,8 @@ $footer_html = laporan_footer_html($kepala);
                 $akhir = $periode[count($periode) - 1];
                 $periode_label = $awal['label'] . ' – ' . $akhir['label'];
             }
-            // No + NIS + Nama + Kelas + Tagihan + Blm + 12 bulan + Total + Dibayar + Tunggakan + Aksi
-            $kolom_total = 10 + count($periode);
+            // No + NIS + Nama + Kelas + Tagihan + Blm + 12 bulan + Total + Dibayar + Tunggakan + Tunggakan Lalu + Aksi
+            $kolom_total = 11 + count($periode);
             ?>
             <div class="card card-outline card-danger mb-3">
                 <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
@@ -429,6 +493,7 @@ $footer_html = laporan_footer_html($kepala);
                         <h5 class="mb-0"><i class="bi bi-exclamation-triangle me-1 text-danger"></i> Daftar Tunggakan Siswa per Bulan</h5>
                         <div class="small text-muted">
                             Periode <?= htmlspecialchars($periode_label); ?> &middot; <?= htmlspecialchars($label_kelas); ?>
+                            &middot; termasuk tunggakan tahun ajaran sebelumnya
                             &middot; urut tunggakan terbesar
                         </div>
                     </div>
@@ -440,10 +505,10 @@ $footer_html = laporan_footer_html($kepala);
                             <thead class="table-light">
                                 <tr>
                                     <th class="text-center" style="width:28px">No</th>
-                                    <th style="width:60px">NIS</th>
-                                    <th style="width:150px">Nama Siswa</th>
-                                    <th style="width:66px">Kelas</th>
-                                    <th class="text-center" style="width:48px" title="Jumlah tagihan">Tagihan</th>
+                                    <th style="width:50px">NIS</th>
+                                    <th style="width:130px">Nama Siswa</th>
+                                    <th style="width:54px">Kelas</th>
+                                    <th class="text-center" style="width:40px" title="Jumlah tagihan">Tagihan</th>
                                     <th class="text-center" style="width:40px" title="Jumlah bulan belum lunas">Blm</th>
                                     <?php foreach ($periode as $p): ?>
                                         <th class="text-center spp-bulan" style="width:34px" title="<?= htmlspecialchars($p['label']); ?>">
@@ -451,9 +516,10 @@ $footer_html = laporan_footer_html($kepala);
                                             <div class="fw-normal text-muted" style="font-size:.6rem;line-height:1"><?= substr((string)$p['tahun'], 2); ?></div>
                                         </th>
                                     <?php endforeach; ?>
-                                    <th class="text-end" style="width:82px">Total</th>
-                                    <th class="text-end" style="width:82px">Dibayar</th>
-                                    <th class="text-end" style="width:86px">Tunggakan</th>
+                                    <th class="text-end" style="width:72px">Total</th>
+                                    <th class="text-end" style="width:70px">Dibayar</th>
+                                    <th class="text-end" style="width:76px">Tunggakan</th>
+                                    <th class="text-end" style="width:76px" title="Tunggakan dari tahun ajaran sebelumnya (kelas saat itu)">Tunggakan Lalu</th>
                                     <th class="text-center no-print" style="width:44px">Aksi</th>
                                 </tr>
                             </thead>
@@ -470,9 +536,9 @@ $footer_html = laporan_footer_html($kepala);
                                             <td class="text-center small"><?= $i + 1; ?></td>
                                             <td class="small"><?= htmlspecialchars($t['nipd']); ?></td>
                                             <td class="small fw-semibold"><?= htmlspecialchars($t['nama']); ?></td>
-                                            <td class="small"><?= htmlspecialchars($t['kelas']); ?></td>
+                                            <td class="small"><?= $t['kelas'] !== '' ? htmlspecialchars($t['kelas']) : '<span class="text-muted">&ndash;</span>'; ?></td>
                                             <td class="text-center small"><?= (int)$t['bulan']; ?></td>
-                                            <td class="text-center small"><span class="badge bg-danger"><?= count($t['belum']); ?></span></td>
+                                            <td class="text-center small"><?= count($t['belum']) > 0 ? '<span class="badge bg-danger">' . count($t['belum']) . '</span>' : '<span class="text-muted">0</span>'; ?></td>
                                             <?php foreach ($periode as $p):
                                                 $key = sprintf('%04d-%02d', (int)$p['tahun'], (int)$p['bulan']);
                                                 $rr = $t['rincian'][$key] ?? null;
@@ -499,6 +565,14 @@ $footer_html = laporan_footer_html($kepala);
                                             <td class="text-end small"><?= spp_rupiah($t['total']); ?></td>
                                             <td class="text-end small text-success"><?= spp_rupiah($t['bayar']); ?></td>
                                             <td class="text-end small fw-bold text-danger"><?= spp_rupiah($t['sisa']); ?></td>
+                                            <td class="text-end small">
+                                                <?php if ($t['lain_sisa'] > 0.005): ?>
+                                                    <span class="fw-bold text-warning-emphasis"><?= spp_rupiah($t['lain_sisa']); ?></span>
+                                                    <span class="badge bg-warning text-dark" title="Jumlah tagihan tahun ajaran sebelumnya"><?= (int)$t['lain_n']; ?></span>
+                                                <?php else: ?>
+                                                    <span class="text-muted">&ndash;</span>
+                                                <?php endif; ?>
+                                            </td>
                                             <td class="text-center no-print">
                                                 <a href="index.php?menu=spp_pembayaran&ta=<?= (int)$id_ta; ?>&siswa=<?= (int)$t['id_siswa']; ?>"
                                                     class="btn btn-sm btn-outline-success" title="Lihat / bayar tagihan">
@@ -515,7 +589,9 @@ $footer_html = laporan_footer_html($kepala);
                         Keterangan: <span class="badge bg-success">L</span> Lunas &middot;
                         <span class="badge bg-warning text-dark">S</span> Sebagian / angsuran &middot;
                         <span class="badge bg-danger">B</span> Belum dibayar (menunggak) &middot;
-                        <span class="text-muted">&ndash;</span> tagihan belum digenerate.
+                        <span class="text-muted">&ndash;</span> tagihan belum digenerate &middot;
+                        kolom <b>Tunggakan Lalu</b> = sisa tagihan dari tahun ajaran sebelumnya (kelas saat tagihan dibuat),
+                        <span class="text-muted">&ndash;</span> bila tidak ada.
                     </div>
                 </div>
             </div>

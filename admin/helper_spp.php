@@ -440,9 +440,10 @@ if (!function_exists('spp_tunggakan_lain')) {
      *
      * @param array<int> $id_siswa
      * @param bool $hanya_sebelum true = hanya TA yang lebih lama (untuk kolom "Tunggakan Lalu")
+     * @param bool $semua true = abaikan daftar $id_siswa (semua siswa)
      * @return array<string,mixed>
      */
-    function spp_tunggakan_lain($koneksi, int $id_ta, array $id_siswa, bool $hanya_sebelum = false): array
+    function spp_tunggakan_lain($koneksi, int $id_ta, array $id_siswa, bool $hanya_sebelum = false, bool $semua = false): array
     {
         $out = ['items' => [], 'siswa' => [], 'total' => 0.0];
         if (!($koneksi instanceof mysqli)) {
@@ -455,22 +456,25 @@ if (!function_exists('spp_tunggakan_lain')) {
                 $ids[$v] = $v;
             }
         }
-        if (!$ids) {
+        if (!$ids && !$semua) {
             return $out;
         }
 
-        $in = implode(',', $ids);
         $sql = "SELECT t.id_tagihan, t.id_siswa, t.id_tahun_ajaran, t.tahun, t.bulan, t.total,
+                       IFNULL(s.nama, '') AS nama, IFNULL(s.nipd, '') AS nipd,
                        IFNULL(ta.tahun_ajaran, '') AS nama_ta,
                        IFNULL(k.nama_kelas, '') AS nama_kelas,
                        IFNULL(k.tingkat, '') AS tingkat,
                        IFNULL((SELECT SUM(p.nominal) FROM dt_spp_pembayaran p
                                 WHERE p.id_tagihan = t.id_tagihan), 0) AS bayar
                   FROM dt_spp_tagihan t
+                  INNER JOIN dt_siswa s ON s.id_siswa = t.id_siswa
                   LEFT JOIN dt_tahun_ajar ta ON ta.id_tahun_ajaran = t.id_tahun_ajaran
                   LEFT JOIN dt_kelas k ON k.id_kelas = t.id_kelas
-                 WHERE t.id_tahun_ajaran <> " . (int)$id_ta . "
-                   AND t.id_siswa IN ($in)";
+                 WHERE t.id_tahun_ajaran <> " . (int)$id_ta;
+        if ($ids && !$semua) {
+            $sql .= " AND t.id_siswa IN (" . implode(',', $ids) . ")";
+        }
 
         // Batasi ke TA yang lebih lama saja (tahun awal < tahun awal TA terpilih),
         // supaya saat membuka TA lama tagihan TA baru tidak ikut disebut "lalu".
