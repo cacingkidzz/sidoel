@@ -424,6 +424,92 @@ if (!function_exists('spp_bulan_singkat')) {
     }
 }
 
+if (!function_exists('spp_tunggakan_lain')) {
+    /**
+     * Tunggakan siswa dari TA LAIN (mis. kelas X) yang belum lunas.
+     *
+     * Dipakai agar tunggakan lama tetap terlihat saat siswa sudah naik kelas
+     * (X -> XI -> XII), karena `dt_spp_tagihan.id_kelas` adalah snapshot kelas
+     * saat tagihan digenerate.
+     *
+     * Hasil:
+     *   items : id_siswa => [ [id_tagihan, tahun, bulan, total, bayar, sisa,
+     *                          label, kelas, nama_ta, id_tahun_ajaran], ... ]
+     *   siswa : id_siswa => ['sisa' => float, 'n' => int]
+     *   total : total sisa seluruh siswa
+     *
+     * @param array<int> $id_siswa
+     * @param bool $hanya_sebelum true = hanya TA yang lebih lama (untuk kolom "Tunggakan Lalu")
+     * @return array<string,mixed>
+     */
+    function spp_tunggakan_lain($koneksi, int $id_ta, array $id_siswa, bool $hanya_sebelum = false): array
+    {
+        $out = ['items' => [], 'siswa' => [], 'total' => 0.0];
+        if (!($koneksi instanceof mysqli)) {
+            return $out;
+        }
+        $ids = [];
+        foreach ($id_siswa as $v) {
+            $v = (int)$v;
+            if ($v > 0) {
+                $ids[$v] = $v;
+            }
+        }
+        if (!$ids) {
+            return $out;
+        }
+
+        $in = implode(',', $ids);
+        $sql = "SELECT t.id_tagihan, t.id_siswa, t.id_tahun_ajaran, t.tahun, t.bulan, t.total,
+                       IFNULL(ta.tahun_ajaran, '') AS nama_ta,
+                       IFNULL(k.nama_kelas, '') AS nama_kelas,
+                       IFNULL(k.tingkat, '') AS tingkat,
+                       IFNULL((SELECT SUM(p.nominal) FROM dt_spp_pembayaran p
+                                WHERE p.id_tagihan = t.id_tagihan), 0) AS bayar
+                  FROM dt_spp_tagihan t
+                  LEFT JOIN dt_tahun_ajar ta ON ta.id_tahun_ajaran = t.id_tahun_ajaran
+                  LEFT JOIN dt_kelas k ON k.id_kelas = t.id_kelas
+                 WHERE t.id_tahun_ajaran <> " . (int)$id_ta . "
+                   AND t.id_siswa IN ($in)";
+
+        // Batasi ke TA yang lebih lama saja (tahun awal < tahun awal TA terpilih),
+        // supaya saat membuka TA lama tagihan TA baru tidak ikut disebut "lalu".
+        if ($hanya_sebelum) {
+            $awal = '';
+            $qta = $koneksi->query("SELECT tahun_ajaran FROM dt_tahun_ajar WHERE id_tahun_ajaran = " . (int)$id_ta . " LIMIT 1");
+            if ($qta && ($rta = $qta->fetch_assoc())) {
+                $awal = substr(trim((string)$rta['tahun_ajaran']), 0, 4);
+            }
+            if ($awal !== '' && ctype_digit($awal)) {
+                $sql .= " AND LEFT(ta.tahun_ajaran, 4) < '" . $awal . "'";
+            }
+        }
+
+        $sql .= " ORDER BY t.tahun ASC, t.bulan ASC, t.id_tagihan ASC";
+        $q = $koneksi->query($sql);
+        if ($q) {
+            while ($r = $q->fetch_assoc()) {
+                $sisa = (float)$r['total'] - (float)$r['bayar'];
+                if ($sisa <= 0.005) {
+                    continue; // sudah lunas
+                }
+                $id = (int)$r['id_siswa'];
+                $r['sisa'] = $sisa;
+                $r['label'] = spp_bulan_label((int)$r['tahun'], (int)$r['bulan']);
+                $r['kelas'] = trim($r['tingkat'] . ' ' . $r['nama_kelas']);
+                $out['items'][$id][] = $r;
+                if (!isset($out['siswa'][$id])) {
+                    $out['siswa'][$id] = ['sisa' => 0.0, 'n' => 0];
+                }
+                $out['siswa'][$id]['sisa'] += $sisa;
+                $out['siswa'][$id]['n']++;
+                $out['total'] += $sisa;
+            }
+        }
+        return $out;
+    }
+}
+
 if (!function_exists('spp_matriks_kelas')) {
     /**
      * Roster + tagihan satu kelas pada satu TA (bahan tabel pembayaran 12 bulan).
@@ -445,6 +531,8 @@ if (!function_exists('spp_matriks_kelas')) {
             'total' => 0.0,
             'terbayar_total' => 0.0,
             'sisa_total' => 0.0,
+            'lain' => ['items' => [], 'siswa' => [], 'total' => 0.0],
+            'lain_total' => 0.0,
         ];
         if ($id_ta <= 0 || $id_kelas <= 0 || !($koneksi instanceof mysqli)) {
             return $out;
@@ -500,6 +588,10 @@ if (!function_exists('spp_matriks_kelas')) {
             }
         }
         $out['sisa_total'] = max(0, $out['total'] - $out['terbayar_total']);
+
+        // Tunggakan dari TA lain (kelas sebelumnya) — tetap tampil saat siswa naik kelas.
+        $out['lain'] = spp_tunggakan_lain($koneksi, $id_ta, $ids, true);
+        $out['lain_total'] = (float)$out['lain']['total'];
 
         return $out;
     }

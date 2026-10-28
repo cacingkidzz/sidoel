@@ -201,13 +201,15 @@ if ($aksi === 'bayar_bulanan') {
         $nama_siswa = $r ? (string)$r['nama'] : '';
     }
 
-    // Tagihan yang dipilih — wajib milik siswa ini (dan TA yang sama bila dikirim).
+    // Tagihan yang dipilih — wajib milik siswa ini. Boleh lintas TA: tunggakan
+    // dari kelas/tahun ajaran sebelumnya ikut dibayar dari halaman kelas saat ini.
     $in = implode(',', $ids);
     $rows = [];
-    $sql = "SELECT id_tagihan, total, tahun, bulan
-              FROM dt_spp_tagihan
-             WHERE id_tagihan IN ($in) AND id_siswa = " . (int)$id_siswa
-        . ($id_ta > 0 ? " AND id_tahun_ajaran = " . (int)$id_ta : '');
+    $sql = "SELECT t.id_tagihan, t.total, t.tahun, t.bulan, t.id_tahun_ajaran,
+                   IFNULL(ta.tahun_ajaran, '') AS nama_ta
+              FROM dt_spp_tagihan t
+              LEFT JOIN dt_tahun_ajar ta ON ta.id_tahun_ajaran = t.id_tahun_ajaran
+             WHERE t.id_tagihan IN ($in) AND t.id_siswa = " . (int)$id_siswa;
     $q = $koneksi->query($sql);
     if ($q) {
         while ($r = $q->fetch_assoc()) {
@@ -231,6 +233,9 @@ if ($aksi === 'bayar_bulanan') {
             continue; // sudah lunas
         }
         $label = spp_bulan_label((int)$r['tahun'], (int)$r['bulan']);
+        if ($id_ta > 0 && (int)$r['id_tahun_ajaran'] !== $id_ta && (string)$r['nama_ta'] !== '') {
+            $label .= ' · TA ' . $r['nama_ta'];
+        }
         $nom = spp_nominal_input($nom_in[$id_tag] ?? '');
         if ($nom <= 0) {
             $nom = $sisa; // default: bayar penuh sisa bulan tsb

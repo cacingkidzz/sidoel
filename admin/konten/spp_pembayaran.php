@@ -245,6 +245,36 @@ if ($id_tagihan > 0) {
     }
 }
 
+// Tunggakan siswa ini dari TA lain (mis. kelas X) — tetap tampil walau sudah naik kelas.
+$lain_siswa = ['items' => [], 'siswa' => [], 'total' => 0.0];
+if ($tagihan) {
+    $id_sw_tgh = (int)$tagihan['id_siswa'];
+    $lain_siswa = spp_tunggakan_lain($koneksi, (int)$tagihan['id_tahun_ajaran'], [$id_sw_tgh]);
+    // Buang tagihan yang sedang dibuka agar tidak tampil dua kali.
+    if (!empty($lain_siswa['items'][$id_sw_tgh])) {
+        $sisa_ulang = 0.0;
+        $items_ulang = [];
+        foreach ($lain_siswa['items'][$id_sw_tgh] as $lt) {
+            if ((int)$lt['id_tagihan'] === $id_tagihan) {
+                continue;
+            }
+            $items_ulang[] = $lt;
+            $sisa_ulang += (float)$lt['sisa'];
+        }
+        if (empty($items_ulang)) {
+            unset($lain_siswa['items'][$id_sw_tgh], $lain_siswa['siswa'][$id_sw_tgh]);
+        } else {
+            $lain_siswa['items'][$id_sw_tgh] = $items_ulang;
+            $lain_siswa['siswa'][$id_sw_tgh] = ['sisa' => $sisa_ulang, 'n' => count($items_ulang)];
+        }
+    }
+    // Hitung ulang total agar konsisten dengan item yang ditampilkan.
+    $lain_siswa['total'] = 0.0;
+    foreach ($lain_siswa['siswa'] as $sw_l) {
+        $lain_siswa['total'] += (float)$sw_l['sisa'];
+    }
+}
+
 // ==========================================================
 // CARI SISWA
 // ==========================================================
@@ -303,6 +333,12 @@ if (!empty($hasil_siswa)) {
         }
     }
     $terbayar_cari = spp_terbayar_map($koneksi, $semua_id);
+}
+
+// Tunggakan dari TA lain (kelas sebelumnya) untuk siswa hasil pencarian
+$lain_cari = ['items' => [], 'siswa' => [], 'total' => 0.0];
+if (!empty($hasil_siswa)) {
+    $lain_cari = spp_tunggakan_lain($koneksi, $id_ta, array_column($hasil_siswa, 'id_siswa'));
 }
 
 // ==========================================================
@@ -461,6 +497,32 @@ unset($_SESSION['spp_kwitansi_multi']);
                                     <tr><td class="text-muted">Sudah dibayar</td><td class="text-end text-success"><?= spp_rupiah($terbayar); ?></td></tr>
                                     <tr class="table-<?= $sisa > 0 ? 'warning' : 'success'; ?>"><td class="fw-bold">Sisa</td><td class="text-end fw-bold"><?= spp_rupiah($sisa); ?></td></tr>
                                 </table>
+                                <?php if (!empty($lain_siswa['items'][(int)$tagihan['id_siswa']])): ?>
+                                    <?php
+                                    $lt_list = $lain_siswa['items'][(int)$tagihan['id_siswa']];
+                                    $lt_sisa = (float)($lain_siswa['siswa'][(int)$tagihan['id_siswa']]['sisa'] ?? 0);
+                                    ?>
+                                    <div class="alert alert-warning mt-3 mb-0 py-2 px-2 small">
+                                        <div class="fw-semibold mb-1">
+                                            <i class="bi bi-exclamation-triangle me-1"></i>
+                                            Siswa ini juga punya <b><?= count($lt_list); ?> tagihan</b> belum lunas
+                                            dari tahun ajaran lain (total <?= spp_rupiah($lt_sisa); ?>).
+                                        </div>
+                                        <ul class="mb-1 ps-3" style="max-height:132px;overflow:auto">
+                                            <?php foreach ($lt_list as $lt): ?>
+                                                <li>
+                                                    <?= htmlspecialchars((string)$lt['label']); ?>
+                                                    &middot; <?= htmlspecialchars((string)$lt['nama_ta']); ?>
+                                                    <?= $lt['kelas'] !== '' ? '&middot; ' . htmlspecialchars($lt['kelas']) : ''; ?>
+                                                    &middot; sisa <?= spp_rupiah((float)$lt['sisa']); ?>
+                                                    <a href="index.php?menu=spp_pembayaran&tagihan=<?= (int)$lt['id_tagihan']; ?>" class="ms-1">bayar</a>
+                                                </li>
+                                            <?php endforeach; ?>
+                                        </ul>
+                                        <a href="index.php?menu=spp_pembayaran&ta=<?= (int)$id_ta; ?>&siswa=<?= (int)$tagihan['id_siswa']; ?>"
+                                            class="fw-semibold">Lihat semua tagihan siswa &rarr;</a>
+                                    </div>
+                                <?php endif; ?>
                                 <div class="mt-3 d-flex flex-wrap gap-2">
                                     <a href="index.php?menu=spp_pembayaran&ta=<?= (int)$id_ta; ?>&siswa=<?= (int)$tagihan['id_siswa']; ?>" class="btn btn-sm btn-outline-primary">
                                         <i class="bi bi-list-ul me-1"></i>Semua tagihan siswa
@@ -597,12 +659,17 @@ unset($_SESSION['spp_kwitansi_multi']);
                             <span class="badge text-bg-light border">Total tagihan <b><?= spp_rupiah($matriks['total']); ?></b></span>
                             <span class="badge text-bg-light border">Terbayar <b class="text-success"><?= spp_rupiah($matriks['terbayar_total']); ?></b></span>
                             <span class="badge text-bg-light border">Tunggakan <b class="text-danger"><?= spp_rupiah($matriks['sisa_total']); ?></b></span>
+                            <?php if (($matriks['lain_total'] ?? 0) > 0): ?>
+                                <span class="badge text-bg-warning border" title="Tagihan dari tahun ajaran sebelumnya yang belum lunas">
+                                    Tunggakan TA lalu <b><?= spp_rupiah($matriks['lain_total']); ?></b>
+                                </span>
+                            <?php endif; ?>
                         </div>
                     </div>
                     <div class="card-body">
                         <?php if ($jml_siswa === 0): ?>
                             <div class="alert alert-warning mb-0">Kelas ini belum memiliki siswa pada tahun ajaran terpilih.</div>
-                        <?php elseif ($jml_tagihan === 0): ?>
+                        <?php elseif ($jml_tagihan === 0 && empty($matriks['lain']['siswa'])): ?>
                             <div class="alert alert-warning mb-0">
                                 Belum ada tagihan untuk kelas ini. Generate dulu di menu
                                 <a href="index.php?menu=spp_tagihan&ta=<?= (int)$id_ta; ?>&kelas=<?= (int)$f_kelas; ?>" class="alert-link">Tagihan SPP</a>.
@@ -620,7 +687,8 @@ unset($_SESSION['spp_kwitansi_multi']);
                                                     <div class="fw-normal text-muted" style="font-size:.72rem"><?= (int)$p['tahun']; ?></div>
                                                 </th>
                                             <?php endforeach; ?>
-                                            <th class="text-end" style="min-width:100px">Sisa</th>
+                                            <th class="text-end" style="min-width:112px" title="Tunggakan dari tahun ajaran sebelumnya (kelas saat itu)">Tunggakan Lalu</th>
+                                            <th class="text-end" style="min-width:100px" title="Sisa tagihan pada tahun ajaran ini (belum termasuk Tunggakan Lalu)">Sisa</th>
                                             <th class="text-center" style="width:96px">Aksi</th>
                                         </tr>
                                     </thead>
@@ -628,6 +696,7 @@ unset($_SESSION['spp_kwitansi_multi']);
                                         <?php $no = 1; foreach ($matriks['siswa'] as $id_siswa => $sw): ?>
                                             <?php
                                             $list = $matriks['tagihan'][$id_siswa] ?? [];
+                                            $lain_s = $matriks['lain']['siswa'][$id_siswa] ?? null;
                                             $sisa_siswa = 0.0;
                                             $bulan_belum = 0;
                                             foreach ($list as $t) {
@@ -667,11 +736,24 @@ unset($_SESSION['spp_kwitansi_multi']);
                                                         </td>
                                                     <?php endif; ?>
                                                 <?php endforeach; ?>
+                                                <td class="text-end small">
+                                                    <?php if ($lain_s && (float)$lain_s['sisa'] > 0.005): ?>
+                                                        <button type="button" class="btn btn-sm btn-outline-danger py-0 px-1"
+                                                                data-bs-toggle="modal" data-bs-target="#modalBayar"
+                                                                data-siswa="<?= (int)$id_siswa; ?>"
+                                                                title="Tunggakan TA sebelumnya: <?= (int)$lain_s['n']; ?> tagihan — klik untuk bayar">
+                                                            <?= spp_rupiah((float)$lain_s['sisa'], ''); ?>
+                                                            <span class="badge bg-danger ms-1"><?= (int)$lain_s['n']; ?></span>
+                                                        </button>
+                                                    <?php else: ?>
+                                                        <span class="text-muted">&mdash;</span>
+                                                    <?php endif; ?>
+                                                </td>
                                                 <td class="text-end small <?= $sisa_siswa > 0 ? 'text-danger fw-semibold' : 'text-success'; ?>">
                                                     <?= spp_rupiah($sisa_siswa, ''); ?>
                                                 </td>
                                                 <td class="text-center">
-                                                    <?php if ($bulan_belum > 0): ?>
+                                                    <?php if ($bulan_belum > 0 || ($lain_s && (float)$lain_s['sisa'] > 0.005)): ?>
                                                         <button type="button" class="btn btn-sm btn-success"
                                                                 data-bs-toggle="modal" data-bs-target="#modalBayar"
                                                                 data-siswa="<?= (int)$id_siswa; ?>">
@@ -692,18 +774,32 @@ unset($_SESSION['spp_kwitansi_multi']);
                                 <span class="badge bg-danger">&nbsp;&nbsp;&nbsp;</span> Belum &middot;
                                 <span class="text-muted">&mdash;</span> belum digenerate.
                                 Angka pada sel = <b>sisa tagihan</b> bulan tsb; klik sel untuk membuka rincian bulan.
+                                <b>Tunggakan Lalu</b> = tagihan dari tahun ajaran sebelumnya (kelas saat itu) yang belum lunas &mdash;
+                                tetap tampil walau siswa sudah naik kelas; klik angkanya untuk ikut dibayar.
                             </div>
                         <?php endif; ?>
                     </div>
                 </div>
 
-                <?php if ($jml_siswa > 0 && $jml_tagihan > 0): ?>
+                <?php if ($jml_siswa > 0 && ($jml_tagihan > 0 || !empty($matriks['lain']['siswa']))): ?>
                     <?php
                     // Data untuk modal bayar bersama: hanya bulan yang belum lunas.
                     $js_data = [];
                     foreach ($matriks['siswa'] as $id_siswa => $sw) {
                         $list = $matriks['tagihan'][$id_siswa] ?? [];
                         $bulan = [];
+                        // Tunggakan TA sebelumnya lebih dulu (label + TA + kelas saat itu).
+                        foreach ($matriks['lain']['items'][$id_siswa] ?? [] as $lt) {
+                            $bulan[] = [
+                                'id' => (int)$lt['id_tagihan'],
+                                'label' => $lt['label'] . ' · ' . ($lt['kelas'] !== '' ? $lt['kelas'] : '-')
+                                    . ' (' . $lt['nama_ta'] . ')',
+                                'total' => (float)$lt['total'],
+                                'bayar' => (float)$lt['bayar'],
+                                'sisa' => round((float)$lt['sisa'], 2),
+                                'lama' => true,
+                            ];
+                        }
                         foreach ($periode as $p) {
                             $key = sprintf('%04d-%02d', (int)$p['tahun'], (int)$p['bulan']);
                             $t = $list[$key] ?? null;
@@ -760,7 +856,7 @@ unset($_SESSION['spp_kwitansi_multi']);
                                                     <th class="text-center" style="width:40px">
                                                         <input type="checkbox" class="form-check-input" id="mbSemua" title="Pilih semua bulan yang belum lunas">
                                                     </th>
-                                                    <th>Bulan</th>
+                                                    <th>Bulan / Tagihan</th>
                                                     <th class="text-end">Total</th>
                                                     <th class="text-end">Dibayar</th>
                                                     <th class="text-end">Sisa</th>
@@ -857,7 +953,13 @@ unset($_SESSION['spp_kwitansi_multi']);
 
                                 var tdLabel = document.createElement('td');
                                 tdLabel.className = 'small text-nowrap';
-                                tdLabel.textContent = b.label;
+                                if (b.lama) {
+                                    var bg = document.createElement('span');
+                                    bg.className = 'badge bg-warning text-dark me-1';
+                                    bg.textContent = 'TA lalu';
+                                    tdLabel.appendChild(bg);
+                                }
+                                tdLabel.appendChild(document.createTextNode(b.label));
 
                                 var tdTotal = document.createElement('td');
                                 tdTotal.className = 'text-end small text-nowrap';
@@ -942,7 +1044,15 @@ unset($_SESSION['spp_kwitansi_multi']);
                                     <span class="text-muted small ms-2">NIS <?= htmlspecialchars((string)$sw['nipd']); ?> &middot;
                                         <?= htmlspecialchars(trim($sw['tingkat'] . ' ' . $sw['nama_kelas'])); ?></span>
                                 </div>
-                                <span class="badge bg-secondary"><?= count($list); ?> tagihan</span>
+                                <div class="d-flex align-items-center gap-2">
+                                    <?php $lain_sw = $lain_cari['siswa'][$id_sw] ?? null; ?>
+                                    <?php if ($lain_sw): ?>
+                                        <span class="badge bg-warning text-dark" title="Tunggakan dari tahun ajaran sebelumnya">
+                                            TA lalu: <?= spp_rupiah((float)$lain_sw['sisa']); ?> &middot; <?= (int)$lain_sw['n']; ?> tagihan
+                                        </span>
+                                    <?php endif; ?>
+                                    <span class="badge bg-secondary"><?= count($list); ?> tagihan</span>
+                                </div>
                             </div>
                             <div class="card-body p-0">
                                 <?php if (empty($list)): ?>
@@ -978,6 +1088,42 @@ unset($_SESSION['spp_kwitansi_multi']);
                                                                 <i class="bi <?= (string)$t['status'] === 'Lunas' ? 'bi-eye' : 'bi-cash-coin'; ?> me-1"></i>
                                                                 <?= (string)$t['status'] === 'Lunas' ? 'Lihat' : 'Bayar'; ?>
                                                             </a>
+                                                        </td>
+                                                    </tr>
+                                                <?php endforeach; ?>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                <?php endif; ?>
+                                <?php if (!empty($lain_cari['items'][$id_sw])): ?>
+                                    <div class="px-3 pt-3 pb-1 small fw-semibold text-danger">
+                                        <i class="bi bi-exclamation-triangle me-1"></i>Tunggakan tahun ajaran sebelumnya
+                                    </div>
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-warning align-middle mb-0">
+                                            <thead>
+                                                <tr>
+                                                    <th>Bulan</th>
+                                                    <th>Tahun Ajaran</th>
+                                                    <th>Kelas Saat Itu</th>
+                                                    <th class="text-end">Total</th>
+                                                    <th class="text-end">Dibayar</th>
+                                                    <th class="text-end">Sisa</th>
+                                                    <th class="text-center">Aksi</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <?php foreach ($lain_cari['items'][$id_sw] as $lt): ?>
+                                                    <tr>
+                                                        <td class="small text-nowrap"><?= htmlspecialchars((string)$lt['label']); ?></td>
+                                                        <td class="small"><?= htmlspecialchars((string)$lt['nama_ta']); ?></td>
+                                                        <td class="small"><?= htmlspecialchars($lt['kelas'] !== '' ? $lt['kelas'] : '-'); ?></td>
+                                                        <td class="text-end small"><?= spp_rupiah((float)$lt['total']); ?></td>
+                                                        <td class="text-end small text-success"><?= spp_rupiah((float)$lt['bayar']); ?></td>
+                                                        <td class="text-end small text-danger"><?= spp_rupiah((float)$lt['sisa']); ?></td>
+                                                        <td class="text-center">
+                                                            <a href="index.php?menu=spp_pembayaran&tagihan=<?= (int)$lt['id_tagihan']; ?>"
+                                                                class="btn btn-sm btn-success"><i class="bi bi-cash-coin me-1"></i>Bayar</a>
                                                         </td>
                                                     </tr>
                                                 <?php endforeach; ?>
