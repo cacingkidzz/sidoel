@@ -11,13 +11,14 @@ jobs:
   deploy:
     name: Upload SiDOEL via FTP
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Ambil file dari GitHub
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Upload ke Rumahweb
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        uses: SamKirkland/FTP-Deploy-Action@v4.4.0
         with:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
@@ -25,7 +26,9 @@ jobs:
           protocol: ftps
           port: 21
           server-dir: ./
+          timeout: 60000
           exclude: |
             **/.git*
             **/.git*/**
             **/.github/**
+            **/node_modules/**
