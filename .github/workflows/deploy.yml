@@ -27,8 +27,22 @@ jobs:
           port: 21
           server-dir: ./
           timeout: 60000
+          # Jangan hapus file di server yang tidak ada di repo (foto upload,
+          # vendor, backup, koneksi.local.php) — kalau true, semua terhapus.
+          dangerous-clean-slate: false
           exclude: |
             **/.git*
             **/.git*/**
             **/.github/**
             **/node_modules/**
+            # Konfigurasi & data khusus server (tidak ada di repo)
+            **/koneksi.local.php
+            **/config.local.php
+            **/vendor/**
+            **/backup/**
+            **/foto_siswa/**
+            **/foto_guru/**
+            **/cek_server.php
+            **/phpinfo.php
+            **/*.sql
+            **/*.sql.gz
