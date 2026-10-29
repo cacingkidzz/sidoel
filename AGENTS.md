@@ -413,6 +413,15 @@ Halaman lain (`detail_kelas.php`, `info_kelas.php`, `denah_siswa.php`, `rekap_ke
 
 ---
 
+## 9. Deployment ke cPanel (Git)
+
+- **`.gitignore`** (root): hanya **kode** yang masuk repo. Diabaikan: `admin/vendor/` (Composer), `admin/koneksi.local.php` (kredensial server), `admin/backup/`, semua `*.sql`, foto upload (`admin/assets/img/foto_siswa|foto_guru`), log, arsip, file OS/editor.
+- **`admin/koneksi.php`**: default lokal (localhost/root/`data_backup`) lalu **memuat `admin/koneksi.local.php` bila ada** (`is_file`) → file itu menimpa `$host/$user/$pass/$db` dan boleh `define('GOOGLE_MAPS_API_KEY', ...)`/`MYSQL_BIN_DIR`. Jadi deploy/`git pull` tidak pernah menimpa kredensial produksi. File lokal dibuat manual sekali di server (tidak di repo).
+- **`.cpanel.yml`**: deploy via cPanel → Git™ Version Control → *Deploy HEAD Commit*. Tugas: `mkdir` folder tujuan + folder writable (`admin/backup`, `img/foto_siswa`, `img/foto_guru`, `img/kop`, `img/logo`) → `cp -R` tiap folder aplikasi (`admin`, `guru`, `portal`, `sekretaris`, `siswa`, `walikelas`, `index.php`) → `composer install --no-dev` (dilewati bila Composer tak ada; unggah `admin/vendor/` manual) → `chmod u+rwX,g+rwX` folder writable. **`DEPLOYPATH` wajib diganti** (`/home/USER/public_html` atau `/home/USER/public_html/sidoel`). `cp` tidak menghapus file yang sudah dihapus dari repo → bersihkan manual bila perlu.
+- Karena DB & upload tidak di repo, data lama di server **aman** saat deploy ulang.
+
+---
+
 - MySQL client: `C:\xampp\mysql\bin\mysql.exe`; PHP CLI: `C:\xampp\php\php.exe`.
 - **Test output `.xlsx` (biner):** jalankan via `cmd.exe /c '"C:\xampp\php\php.exe" "script.php" > "out.xlsx"'` (redirect PowerShell `>` merusak biner). Verifikasi dengan `IOFactory::load()` + `$sheet->getDrawingCollection()`.
 - **PowerShell:** `<` redirect tidak didukung; `php -r "..."` bermasalah dengan escaping → tulis skrip ke `C:\Users\Govinda\AppData\Local\Temp\opencode\*.php` lalu jalankan.

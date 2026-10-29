@@ -1,37 +1,77 @@
-# === SiDoel .gitignore ===
+# ============================================================================
+# SiDoel — .gitignore
+# Aplikasi: PHP native (mysqli) + Bootstrap 5 / AdminLTE 4
+# Repo ini berisi KODE saja. Data (DB dump), upload user, dan dependensi
+# Composer tidak di-commit.
+# ============================================================================
 
-# Dependensi Composer (jangan di-commit; jalankan composer install di production)
+# --- Dependensi Composer ----------------------------------------------------
+# Jangan di-commit. Di server: `composer install --no-dev` (lihat .cpanel.yml)
+# atau unggah folder vendor/ sekali lewat File Manager.
 admin/vendor/
 
-# Backup database hasil fitur Backup & Restore
-admin/backup/*.sql
+# --- Konfigurasi produksi (RAHASIA) ----------------------------------------
+# File ini berisi kredensial DB / API key server dan DIBACA OTOMATIS oleh
+# admin/koneksi.php bila ada. Buat manual di server, jangan pernah di-commit.
+admin/koneksi.local.php
+.env
+.env.*
+!.env.example
+config.local.php
 
-# Dump database di root proyek
+# --- Backup database (fitur Backup & Restore) ------------------------------
+admin/backup/
+
+# --- Dump / skrip SQL ------------------------------------------------------
+# Schema & dump data (data_backup*.sql, spp.sql, jadwal_smk.sql, dst.)
+# diimpor lewat phpMyAdmin, bukan lewat git.
 *.sql
+*.sql.gz
 **/*.sql
 
-# File foto siswa/guru (upload user, tidak di-commit)
+# --- Upload user (foto, kop, logo) ----------------------------------------
+# File di dalam folder ini milik sekolah; jangan ditimpa/di-commit.
+# Folder dibuat otomatis oleh .cpanel.yml saat deploy.
 admin/assets/img/foto_siswa/*
 admin/assets/img/foto_guru/*
 
-# Log dan cache
+# --- Log & cache -----------------------------------------------------------
 *.log
+error_log
+php_errorlog
 admin/*.log
+admin/backup/*.log
+*.cache
+.cache/
 
-# OS & editor
+# --- File sementara / arsip ------------------------------------------------
+tmp/
+temp/
+*.tmp
+*.bak
+*.orig
+*.swp
+*.swo
+*~
+*.zip
+*.rar
+*.7z
+
+# --- OS & editor -----------------------------------------------------------
 Thumbs.db
+desktop.ini
 .DS_Store
 .vscode/
 .idea/
 *.sublime-project
 *.sublime-workspace
+nbproject/
 
-# Environment / sensitive (buat production nanti)
-.env
-.env.local
-config.php
+# --- Node (tidak dipakai, jaga-jaga) --------------------------------------
+node_modules/
+package-lock.json
 
-# Temporary test files
-tmp/
-temp/
-*.tmp
+# --- CATATAN ---------------------------------------------------------------
+# Yang HARUS tetap di-commit:
+#   .cpanel.yml, admin/composer.json, admin/composer.lock, AGENTS.md,
+#   seluruh kode PHP, CSS/JS, dan gambar bawaan (pria.png, wanita.png, logo).

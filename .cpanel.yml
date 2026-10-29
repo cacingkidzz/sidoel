@@ -1,0 +1,59 @@
+---
+# ============================================================================
+# .cpanel.yml — deploy otomatis SiDoel ke cPanel
+# (cPanel → Git™ Version Control → Pull or Deploy → Deploy HEAD Commit)
+#
+# LANGKAH SEKALI KALI:
+#   1. GANTI baris "export DEPLOYPATH=..." di bawah dengan folder tujuan
+#      aplikasi di hosting Anda (tanpa garis miring di akhir). Contoh:
+#        domain utama    : /home/USER/public_html
+#        subfolder       : /home/USER/public_html/sidoel
+#        addon domain    : /home/USER/namaaddon.com
+#      Ganti USER dengan username cPanel Anda (lihat cPanel → File Manager).
+#   2. Pastikan database sudah dibuat + diimpor lewat phpMyAdmin.
+#   3. Buat file admin/koneksi.local.php di server (sekali saja) berisi
+#      kredensial DB produksi — file ini TIDAK ikut ter-deploy/tertimpa.
+#   4. Deploy. Setelah itu setiap "Deploy HEAD Commit" akan memperbarui kode
+#      TANPA menyentuh: koneksi.local.php, foto siswa/guru, kop, dan backup DB.
+#
+# CATATAN
+#   - Dependensi Composer (admin/vendor/) tidak disimpan di git. Bila server
+#     tidak punya Composer, unggah folder admin/vendor/ sekali lewat File
+#     Manager (atau jalankan composer install di Terminal cPanel).
+#   - Folder upload & backup dibuat/di-set writable oleh tugas di bawah.
+#   - File yang dihapus dari repo TIDAK ikut terhapus di server (cp tidak
+#     sinkron menghapus). Bersihkan manual bila perlu.
+# ============================================================================
+
+deployment:
+  tasks:
+    # --- 1. Folder tujuan (WAJIB DIGANTI) -----------------------------------
+    - export DEPLOYPATH=/home/CPANELUSER/public_html/sidoel
+
+    # --- 2. Siapkan folder tujuan + folder yang harus writable --------------
+    - /bin/mkdir -p $DEPLOYPATH
+    - /bin/mkdir -p $DEPLOYPATH/admin/backup
+    - /bin/mkdir -p $DEPLOYPATH/admin/assets/img/foto_siswa
+    - /bin/mkdir -p $DEPLOYPATH/admin/assets/img/foto_guru
+    - /bin/mkdir -p $DEPLOYPATH/admin/assets/img/kop
+    - /bin/mkdir -p $DEPLOYPATH/admin/assets/img/logo
+
+    # --- 3. Salin kode aplikasi (gabung dengan folder yang sudah ada) -------
+    - /bin/cp -R admin $DEPLOYPATH
+    - /bin/cp -R guru $DEPLOYPATH
+    - /bin/cp -R portal $DEPLOYPATH
+    - /bin/cp -R sekretaris $DEPLOYPATH
+    - /bin/cp -R siswa $DEPLOYPATH
+    - /bin/cp -R walikelas $DEPLOYPATH
+    - /bin/cp -f index.php $DEPLOYPATH/index.php
+
+    # --- 4. Dependensi Composer (PhpSpreadsheet) ---------------------------
+    # Dilewati otomatis bila Composer tidak tersedia (pakai vendor/ manual).
+    - cd $DEPLOYPATH/admin && (command -v composer >/dev/null 2>&1 && composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader || echo "[SiDoel] composer tidak ditemukan - lewati (pastikan admin/vendor/ sudah ada)")
+
+    # --- 5. Izin tulis untuk fitur upload & Backup/Restore ------------------
+    - /bin/chmod -R u+rwX,g+rwX $DEPLOYPATH/admin/backup
+    - /bin/chmod -R u+rwX,g+rwX $DEPLOYPATH/admin/assets/img/foto_siswa
+    - /bin/chmod -R u+rwX,g+rwX $DEPLOYPATH/admin/assets/img/foto_guru
+    - /bin/chmod -R u+rwX,g+rwX $DEPLOYPATH/admin/assets/img/kop
+    - /bin/chmod -R u+rwX,g+rwX $DEPLOYPATH/admin/assets/img/logo
