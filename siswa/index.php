@@ -28,6 +28,38 @@ $ta_label = siswa_ta($koneksi, $id_ta);
 $foto_url = siswa_foto_url($s);
 $kel = kel_baris($s);
 
+/* ---- Ringkasan pembayaran SPP (read-only, untuk pintasan menu Pembayaran) ---- */
+require_once __DIR__ . '/../admin/helper_spp.php';
+$spp = ['ada' => false, 'total' => 0.0, 'bayar' => 0.0, 'sisa' => 0.0, 'lain' => 0.0, 'bulan' => 0, 'lunas' => 0];
+$stmt = $koneksi->prepare(
+    "SELECT t.id_tahun_ajaran, t.total,
+            IFNULL((SELECT SUM(p.nominal) FROM dt_spp_pembayaran p WHERE p.id_tagihan = t.id_tagihan), 0) AS bayar
+       FROM dt_spp_tagihan t
+      WHERE t.id_siswa = ?"
+);
+if ($stmt) {
+    $stmt->bind_param('i', $id_siswa);
+    $stmt->execute();
+    $res = $stmt->get_result();
+    while ($r = $res->fetch_assoc()) {
+        $spp['ada'] = true;
+        $tt = (float)$r['total'];
+        $tb = (float)$r['bayar'];
+        $sisa = max(0, $tt - $tb);
+        if ((int)$r['id_tahun_ajaran'] === $id_ta) {
+            $spp['total'] += $tt;
+            $spp['bayar'] += $tb;
+            $spp['sisa'] += $sisa;
+            $spp['bulan']++;
+            if ($sisa <= 0.005) $spp['lunas']++;
+        } else {
+            $spp['lain'] += $sisa;   // tunggakan TA sebelumnya
+        }
+    }
+    $stmt->close();
+}
+$spp_sisa_total = $spp['sisa'] + $spp['lain'];
+
 $judul = 'Profil Saya';
 $active = 'profil';
 $siswa = $s;
@@ -58,6 +90,47 @@ require __DIR__ . '/_header.php';
         </div>
         <a href="edit.php" class="btn btn-primary btn-sm w-100 mt-3">
             <i class="bi bi-pencil-square me-1"></i>Ubah Data Saya
+        </a>
+    </div>
+</div>
+
+<div class="card ss-card mb-2">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <div class="ss-section-title"><i class="bi bi-cash-coin me-1"></i>Pembayaran SPP</div>
+            <?php if (!$spp['ada']) : ?>
+                <span class="badge bg-secondary">Belum ada tagihan</span>
+            <?php elseif ($spp_sisa_total <= 0.005) : ?>
+                <span class="badge bg-success">Lunas</span>
+            <?php else : ?>
+                <span class="badge bg-danger">Sisa <?= spp_rupiah($spp_sisa_total); ?></span>
+            <?php endif; ?>
+        </div>
+        <div class="row row-cols-3 g-2">
+            <div class="col">
+                <div class="ss-label">Tagihan</div>
+                <div class="ss-value"><?= spp_rupiah($spp['total'], ''); ?></div>
+            </div>
+            <div class="col">
+                <div class="ss-label">Dibayar</div>
+                <div class="ss-value text-success"><?= spp_rupiah($spp['bayar'], ''); ?></div>
+            </div>
+            <div class="col">
+                <div class="ss-label">Sisa</div>
+                <div class="ss-value text-danger"><?= spp_rupiah($spp['sisa'], ''); ?></div>
+            </div>
+        </div>
+        <?php if ($spp['lain'] > 0.005) : ?>
+            <div class="alert alert-warning py-2 px-3 mt-2 mb-0 small">
+                <i class="bi bi-clock-history me-1"></i>
+                Tunggakan tahun ajaran sebelumnya: <b><?= spp_rupiah($spp['lain']); ?></b>
+            </div>
+        <?php endif; ?>
+        <div class="small text-muted mt-2">
+            <?= (int)$spp['lunas']; ?>/<?= (int)$spp['bulan']; ?> bulan lunas pada TA <?= siswa_esc($ta_label); ?>
+        </div>
+        <a href="pembayaran.php" class="btn btn-outline-primary btn-sm w-100 mt-2">
+            <i class="bi bi-receipt me-1"></i>Lihat Informasi Pembayaran
         </a>
     </div>
 </div>
