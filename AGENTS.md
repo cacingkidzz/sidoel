@@ -316,6 +316,8 @@ Halaman lain (`detail_kelas.php`, `info_kelas.php`, `denah_siswa.php`, `rekap_ke
 - **`dt_kelas_siswa` punya 813 baris orphan** (id_siswa tak ada di `dt_siswa`). Query agregat siswa **WAJIB** `INNER JOIN dt_siswa` atau filter `id_tahun_ajaran` + `COUNT(DISTINCT s.id_siswa)`, jika tidak angka membengkak.
 - **Filter tahun ajaran wajib.** Banyak query agregat harus `AND ksw.id_tahun_ajaran = '$id_ta'`. `id_ta` berasal dari nama TA di session.
 - **Login = MD5** (jangan ubah ke bcrypt tanpa migrasi data). Password siswa/PPDB = bcrypt.
+- **Koneksi DB gagal → halaman diagnosa, bukan 500 kosong.** `admin/koneksi.php` memakai `mysqli_report(MYSQLI_REPORT_OFF)` + `try/catch` di sekitar `new mysqli()`. Di PHP 8.1+ `new mysqli()` melempar `mysqli_sql_exception`, sehingga kredensial salah membuat **seluruh halaman** (yang semuanya `require` koneksi.php) mati dengan `HTTP ERROR 500` tanpa pesan. Sekarang tampil halaman **503** berisi pesan server, versi PHP, status ekstensi `mysqli`, dan ada/tidaknya `koneksi.local.php`. **Penyebab 500 paling sering saat deploy = `admin/koneksi.local.php` belum dibuat di server.**
+- **PHP minimal 8.0** (kode memakai `match()` di `beranda.php`, `detail_kelas.php`, `guru.php`, `guru_mapel.php`; disarankan 8.1/8.2). Diagnosa cepat di server: unggah `cek_server.php` (gitignored, jangan di-commit) lalu hapus setelah dipakai.
 - **`assets/img/`** bukan `assets/images/`.
 - **SweetAlert global** via `?pesan=`; tak perlu alert lokal untuk sukses.
 - Chart.js hanya di `beranda.php`; Leaflet hanya relevan di `denah_siswa`/`data_sekolah`.

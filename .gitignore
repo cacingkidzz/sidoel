@@ -71,6 +71,12 @@ nbproject/
 node_modules/
 package-lock.json
 
+# --- Diagnosa sementara (jangan ikut deploy) ------------------------------
+cek_server.php
+phpinfo.php
+info.php
+test.php
+
 # --- CATATAN ---------------------------------------------------------------
 # Yang HARUS tetap di-commit:
 #   .cpanel.yml, admin/composer.json, admin/composer.lock, AGENTS.md,
