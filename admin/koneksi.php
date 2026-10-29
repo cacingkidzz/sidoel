@@ -36,8 +36,12 @@ if ($koneksi->connect_error) {
 }
 
 // Konfigurasi aplikasi
+// Kunci Google Maps TIDAK disimpan di repo (agar tidak bocor saat repo dibagikan).
+// Isi di admin/koneksi.local.php (tidak ikut git):
+//   define('GOOGLE_MAPS_API_KEY', 'KEY_ANDA');
+// Bila kosong, aplikasi tetap jalan — hanya peta yang tidak tampil.
 if (!defined('GOOGLE_MAPS_API_KEY')) {
-    define('GOOGLE_MAPS_API_KEY', 'AIzaSyAsGJSXm412kL3GXd0zGAjwzVIGupbIWoE');
+    define('GOOGLE_MAPS_API_KEY', '');
 }
 
 // Lokasi binary MySQL (untuk fitur Backup/Restore — Administrasi Sistem).
