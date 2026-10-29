@@ -424,6 +424,7 @@ Halaman lain (`detail_kelas.php`, `info_kelas.php`, `denah_siswa.php`, `rekap_ke
   - **`admin/.htaccess`** — blokir `admin/backup/` (dump DB) & `admin/vendor/` (Composer) dari akses web (`RewriteRule ^backup|^vendor`, fallback `RedirectMatch 404`), plus tanpa directory listing. PHP tetap bisa `require` vendor karena itu level filesystem.
   - **`admin/assets/img/.htaccess`** — cegah eksekusi skrip terunggah (`.php/.phtml/.phar/.cgi/...` ditolak) di folder foto/kop/logo.
   - Teruji via HTTP: `/AGENTS.md`, `/.gitignore`, `/.cpanel.yml`, `*.sql`, `admin/composer.lock`, `admin/backup/` (+ file dump), `admin/vendor/*` → **403**; `/`, `admin/login.php`, `siswa/login.php`, `admin/laporan/format_data_guru.xlsx`, gambar → **200**; file `.php` uji di folder foto → **403**.
+- **`DEPLOY.md`** (root): panduan lengkap deploy cPanel 10 langkah (prasyarat PHP/ekstensi, buat DB + impor dump via phpMyAdmin, clone repo di Git Version Control, ganti `DEPLOYPATH`, buat `admin/koneksi.local.php`, Composer/`vendor`, verifikasi URL + login, keamanan, update rutin, troubleshooting, struktur folder server). Ikut ter-blokir dari web oleh `.htaccess`.
 
 ---
 
