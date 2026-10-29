@@ -1,0 +1,31 @@
+
+name: Deploy SiDOEL ke Rumahweb
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Upload SiDOEL via FTP
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Ambil file dari GitHub
+        uses: actions/checkout@v4
+
+      - name: Upload ke Rumahweb
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftps
+          port: 21
+          server-dir: ./
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/.github/**
