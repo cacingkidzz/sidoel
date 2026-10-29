@@ -51,7 +51,7 @@ while ($g = $qguru->fetch_assoc()) {
             </div>
 
             <div class="row">
-                <div class="col-md-3 mb-3">
+                <div class="col-6 col-md-4 col-xl mb-3">
                     <?php
                     $qadmin = $koneksi->query("SELECT COUNT(*) as total FROM dt_user WHERE level_user='Admin'");
                     $dadmin = $qadmin->fetch_assoc();
@@ -71,7 +71,7 @@ while ($g = $qguru->fetch_assoc()) {
                     </div>
                 </div>
 
-                <div class="col-md-3 mb-3">
+                <div class="col-6 col-md-4 col-xl mb-3">
                     <?php
                     $qkurikulum = $koneksi->query("SELECT COUNT(*) as total FROM dt_user WHERE level_user='Kurikulum'");
                     $dkurikulum = $qkurikulum->fetch_assoc();
@@ -91,7 +91,7 @@ while ($g = $qguru->fetch_assoc()) {
                     </div>
                 </div>
 
-                <div class="col-md-3 mb-3">
+                <div class="col-6 col-md-4 col-xl mb-3">
                     <?php
                     $qkesiswaan = $koneksi->query("SELECT COUNT(*) as total FROM dt_user WHERE level_user='Kesiswaan'");
                     $dkesiswaan = $qkesiswaan->fetch_assoc();
@@ -111,7 +111,7 @@ while ($g = $qguru->fetch_assoc()) {
                     </div>
                 </div>
 
-                <div class="col-md-3 mb-3">
+                <div class="col-6 col-md-4 col-xl mb-3">
                     <?php
                     $qguru = $koneksi->query("SELECT COUNT(*) as total FROM dt_user WHERE level_user='Guru'");
                     $dguru = $qguru->fetch_assoc();
@@ -125,6 +125,26 @@ while ($g = $qguru->fetch_assoc()) {
                                 <div class="col">
                                     <h4 class="mb-0 text-end"><?= $dguru['total']; ?></h4>
                                     <h6 class="text-end opacity-75">Guru</h6>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-6 col-md-4 col-xl mb-3">
+                    <?php
+                    $qbendahara = $koneksi->query("SELECT COUNT(*) as total FROM dt_user WHERE level_user='Bendahara'");
+                    $dbendahara = $qbendahara->fetch_assoc();
+                    ?>
+                    <div class="card bg-warning text-dark shadow-sm">
+                        <div class="card-body">
+                            <div class="row align-items-center">
+                                <div class="col-auto">
+                                    <i class="bi bi-cash-coin fs-2 opacity-75"></i>
+                                </div>
+                                <div class="col">
+                                    <h4 class="mb-0 text-end"><?= $dbendahara['total']; ?></h4>
+                                    <h6 class="text-end opacity-75">Bendahara</h6>
                                 </div>
                             </div>
                         </div>
@@ -189,6 +209,9 @@ while ($g = $qguru->fetch_assoc()) {
                                                     break;
                                                 case 'Guru':
                                                     $badge_class = 'bg-primary';
+                                                    break;
+                                                case 'Bendahara':
+                                                    $badge_class = 'bg-warning text-dark';
                                                     break;
                                                 default:
                                                     $badge_class = 'bg-secondary';
@@ -294,9 +317,9 @@ while ($g = $qguru->fetch_assoc()) {
                     <input type="hidden" name="aksi" value="tambah">
 
                     <div class="mb-3">
-                        <label class="form-label fw-bold">Guru Terkait (Akses Portal Guru/Wali)</label>
-                        <select class="form-select select2" name="id_fk" id="id_fk_guru" required>
-                            <option value="">-- Pilih Guru yang Belum Punya Akun --</option>
+                        <label class="form-label fw-bold">Guru Terkait <span class="text-muted fw-normal">(opsional — akses Portal Guru/Wali)</span></label>
+                        <select class="form-select select2" name="id_fk" id="id_fk_guru">
+                            <option value="">-- Tanpa relasi guru (mis. Bendahara / staf) --</option>
                             <?php foreach ($guru_data as $g): ?>
                                 <option value="<?= $g['id_guru'] ?>"
                                     data-nama="<?= htmlspecialchars($g['nama_guru']) ?>"
@@ -305,12 +328,13 @@ while ($g = $qguru->fetch_assoc()) {
                                 </option>
                             <?php endforeach; ?>
                         </select>
-                        <small class="form-text text-muted">Relasi ini juga memberi akses Portal Guru/Wali Kelas. Level utama tetap menentukan menu Admin (mis. Kesiswaan yang juga mengajar cukup pilih level Kesiswaan + guru terkait).</small>
+                        <small class="form-text text-muted">Bila guru dipilih, username otomatis terisi email guru dan akun mendapat akses Portal Guru/Wali Kelas. Untuk staf non-guru (mis. <b>Bendahara</b>), biarkan kosong lalu isi username manual. Level utama tetap menentukan menu Admin.</small>
                     </div>
 
                     <div class="mb-3">
                         <label class="form-label fw-bold">Username (Email)</label>
-                        <input type="email" class="form-control" id="username" name="username" readonly required>
+                        <input type="email" class="form-control" id="username" name="username" placeholder="ketik email/username" required>
+                        <small class="form-text text-muted" id="username_hint">Pilih guru di atas untuk mengisi otomatis, atau ketik manual bila tanpa relasi guru.</small>
                     </div>
 
                     <div class="mb-3">
@@ -320,12 +344,14 @@ while ($g = $qguru->fetch_assoc()) {
 
                     <div class="mb-3">
                         <label class="form-label fw-bold">Level Akses</label>
-                        <select class="form-select" name="level_user" required>
+                        <select class="form-select" name="level_user" id="level_user_baru" required>
                             <option value="Admin">Admin</option>
                             <option value="Kurikulum">Kurikulum</option>
                             <option value="Kesiswaan">Kesiswaan</option>
+                            <option value="Bendahara">Bendahara (Keuangan / SPP)</option>
                             <option value="Guru" selected>Guru</option>
                         </select>
+                        <small class="form-text text-muted">Bendahara: hanya menu <b>Keuangan (SPP)</b> — tarif, tagihan, pembayaran, rekap &amp; tunggakan — plus data siswa read-only.</small>
                     </div>
                 </div>
                 <div class="modal-footer">

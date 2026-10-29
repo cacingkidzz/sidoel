@@ -23,8 +23,11 @@ $pass   = "";
 $db     = "data_backup";
 
 // Override konfigurasi produksi (tidak ikut git).
+// require_once: file ini bisa ikut ter-include beberapa kali per request
+// (mis. index.php + konten/*.php), dan define() di dalamnya akan memicu
+// "Constant ... already defined" bila dimuat dua kali.
 if (is_file(__DIR__ . '/koneksi.local.php')) {
-    require __DIR__ . '/koneksi.local.php';
+    require_once __DIR__ . '/koneksi.local.php';
 }
 
 // buat koneksi

@@ -493,7 +493,9 @@ $badge_tingkat = function ($t) {
                     <div class="card dash-card h-100">
                         <div class="card-header d-flex justify-content-between align-items-center">
                             <h6 class="mb-0 fw-bold"><i class="bi bi-bookmark-star text-success me-1"></i> Jumlah Siswa per Agama di Setiap Kelas</h6>
+                            <?php if (!function_exists('boleh_menu') || boleh_menu($level_user, 'siswa_aktif')): ?>
                             <a href="index.php?menu=siswa_aktif" class="small text-decoration-none">Kelola <i class="bi bi-arrow-right"></i></a>
+                            <?php endif; ?>
                         </div>
                         <div class="card-body p-0">
                             <div class="table-responsive dash-scroll">

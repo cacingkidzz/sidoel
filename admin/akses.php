@@ -32,6 +32,13 @@ const AKSES_MENU = [
     'Guru' => [
         'beranda', 'dashboard_wali_kelas', 'info_kelas', 'detail_kelas', 'denah_siswa', 'siswa_aktif', 'siswa_detail',
     ],
+    // Bendahara: seluruh modul keuangan (SPP) + data siswa READ-ONLY untuk
+    // mencari/memeriksa siswa (tanpa menu CRUD siswa, tanpa data master).
+    'Bendahara' => [
+        'beranda',
+        'spp_tarif', 'spp_tagihan', 'spp_pembayaran', 'spp_rekap',
+        'siswa_detail', 'info_kelas', 'detail_kelas',
+    ],
 ];
 
 // Menu yang selalu diizinkan bagi siapa pun yang sudah login.

@@ -15,30 +15,49 @@ if (isset($_POST['aksi']) || isset($_GET['aksi'])) {
 
     // --- FUNGSI TAMBAH DATA USER BARU ---
     if ($aksi == 'tambah') {
-        // Ambil dan sanitasi data POST
-        $id_fk       = $_POST['id_fk']; // ID Relasi ke dt_guru
-        $username    = $koneksi->real_escape_string($_POST['username']);
+        // Ambil data POST
+        $id_fk        = isset($_POST['id_fk']) ? (int) $_POST['id_fk'] : 0;
+        $username     = trim((string) ($_POST['username'] ?? ''));
+        $password_raw = trim((string) ($_POST['password'] ?? ''));
+        $level_user   = (string) ($_POST['level_user'] ?? '');
 
-        // FIX: Gunakan trim() untuk menghilangkan spasi tersembunyi
-        $password_raw = trim($_POST['password']); // Password mentah
+        // Level akses yang sah (whitelist — cegah nilai enum tak dikenal)
+        $level_diizinkan = ['Admin', 'Kurikulum', 'Kesiswaan', 'Guru', 'Bendahara'];
 
-        $level_user  = $koneksi->real_escape_string($_POST['level_user']);
+        if ($username === '' || $password_raw === '' || !in_array($level_user, $level_diizinkan, true)) {
+            $_SESSION['alert'] = ['type' => 'danger', 'msg' => 'Data user tidak lengkap atau level akses tidak valid.'];
+            header("Location: ../index.php?menu=user");
+            exit;
+        }
 
         // 1. Hashing Password (bcrypt)
         $password_hash = hash_password($password_raw);
 
-        // 2. Query INSERT
-        $sql = "INSERT INTO dt_user (username, password, level_user, id_fk, status_aktif) 
-                VALUES ('$username', '$password_hash', '$level_user', '$id_fk', 'Y')";
+        // 2. Query INSERT (prepared). id_fk kosong = tanpa relasi guru (mis. Bendahara).
+        $id_fk_val = $id_fk > 0 ? $id_fk : null;
+        $stmt = $koneksi->prepare("INSERT INTO dt_user (username, password, level_user, id_fk, status_aktif) VALUES (?, ?, ?, ?, 'Y')");
+        $berhasil = false;
+        $errno = 0;
+        $error = '';
+        if ($stmt) {
+            $stmt->bind_param('sssi', $username, $password_hash, $level_user, $id_fk_val);
+            $berhasil = $stmt->execute();
+            $errno = $stmt->errno;
+            $error = $stmt->error;
+            $stmt->close();
+        } else {
+            $errno = $koneksi->errno;
+            $error = $koneksi->error;
+        }
 
-        if ($koneksi->query($sql)) {
-            $_SESSION['alert'] = ['type' => 'success', 'msg' => 'Akun user **' . $username . '** berhasil ditambahkan dengan level **' . $level_user . '**.'];
+        if ($berhasil) {
+            $_SESSION['alert'] = ['type' => 'success', 'msg' => 'Akun user <b>' . htmlspecialchars($username) . '</b> berhasil ditambahkan dengan level <b>' . htmlspecialchars($level_user) . '</b>.'];
         } else {
             // Cek jika error karena UNIQUE constraint (username sudah ada)
-            if ($koneksi->errno == 1062) {
-                $_SESSION['alert'] = ['type' => 'warning', 'msg' => 'Gagal! Username (Email) **' . $username . '** sudah terdaftar.'];
+            if ($errno == 1062) {
+                $_SESSION['alert'] = ['type' => 'warning', 'msg' => 'Gagal! Username (Email) <b>' . htmlspecialchars($username) . '</b> sudah terdaftar.'];
             } else {
-                $_SESSION['alert'] = ['type' => 'danger', 'msg' => 'Data user gagal ditambahkan. Error: ' . $koneksi->error];
+                $_SESSION['alert'] = ['type' => 'danger', 'msg' => 'Data user gagal ditambahkan. Error: ' . htmlspecialchars($error)];
             }
         }
 

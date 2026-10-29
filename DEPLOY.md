@@ -33,6 +33,10 @@ berbasis **cPanel** memakai fitur **Git™ Version Control**. Perkiraan waktu: 1
 > Dump terbaru bisa dibuat dari lokal: `mysqldump -u root --single-transaction --routines --events data_backup > sidoel.sql`
 > atau dari aplikasi: **Admin → Administrasi Sistem → Backup & Restore**.
 
+> **Dump lama (sebelum ada peran Bendahara)?** Jalankan sekali di phpMyAdmin → tab **SQL**:
+> `ALTER TABLE dt_user MODIFY COLUMN level_user ENUM('Admin','Kurikulum','Kesiswaan','Guru','Bendahara') NOT NULL;`
+> (file `bendahara_role.sql`). Tanpa ini, akun **Bendahara** tidak bisa dibuat/di-set.
+
 ---
 
 ## 2. Clone repo lewat cPanel Git

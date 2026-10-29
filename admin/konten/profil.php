@@ -30,6 +30,7 @@ $badge_level = [
     'Kurikulum' => 'bg-success',
     'Kesiswaan' => 'bg-info',
     'Guru' => 'bg-primary',
+    'Bendahara' => 'bg-warning text-dark',
 ][$u['level_user'] ?? ''] ?? 'bg-secondary';
 
 $is_md5 = $u && password_md5_lama($u['password']);

@@ -1000,7 +1000,7 @@ $isAdministrasiActive = in_array($activeMenu, $administrasiMenus);
             $('#id_fk_guru').select2({
                 width: '100%',
                 dropdownParent: $('#tambahUser'),
-                placeholder: "-- Pilih Guru yang Belum Punya Akun --",
+                placeholder: "-- Tanpa relasi guru (mis. Bendahara / staf) --",
                 allowClear: true
             });
 
@@ -1013,13 +1013,20 @@ $isAdministrasiActive = in_array($activeMenu, $administrasiMenus);
                 // jQuery .data() lebih mudah digunakan daripada getAttribute()
                 var email = selectedOption.data('email');
 
-                // Set nilai ke input username
+                // Set nilai ke input username; tanpa guru -> boleh diketik manual
                 if (email) {
-                    $('#username').val(email);
+                    $('#username').val(email).prop('readonly', true);
+                    $('#username_hint').hide();
                 } else {
-                    $('#username').val('');
+                    $('#username').val('').prop('readonly', false);
+                    $('#username_hint').show();
                 }
             });
+
+            // Kondisi awal: bila belum ada guru terpilih, username bisa diketik
+            if (!$('#id_fk_guru').val()) {
+                $('#username').prop('readonly', false);
+            }
         });
     </script>
 
