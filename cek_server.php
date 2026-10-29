@@ -11,10 +11,10 @@
  * bisa jalan walau versi PHP hosting masih 5.6/7.x — justru itu yang mau dicek.
  */
 
+header('X-Robots-Tag: noindex, nofollow', true);
+
 // Baris paling awal: kalau ini saja tidak muncul, PHP memang tidak jalan.
 echo '<!-- PHP ' . PHP_VERSION . ' | SAPI ' . PHP_SAPI . ' -->';
-
-header('X-Robots-Tag: noindex, nofollow', true);
 
 error_reporting(E_ALL);
 ini_set('display_errors', '1');
