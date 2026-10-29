@@ -11,6 +11,7 @@
 include('koneksi.php');
 require_once(__DIR__ . '/helper_laporan.php');
 require_once(__DIR__ . '/../helper_kelengkapan.php');
+require_once(__DIR__ . '/../helper_spp.php');
 require_once(__DIR__ . '/../akses.php');
 
 $level_user = $_SESSION['level_user'] ?? 'Guru';
@@ -268,6 +269,64 @@ foreach (kel_required_fields() as $kf) {
         $kel_terlemah = ['label' => $kf['label'], 'kosong' => $kel_field_kosong[$kf['key']]];
     }
 }
+
+// ==========================================================
+// TUNGGAKAN SPP SISWA (TA ini + TA sebelumnya)
+// Wali kelas dapat memantau tunggakan SPP kelasnya di sini.
+// Read-only: penagihan/pembayaran tetap di menu Keuangan (SPP).
+// ==========================================================
+$spp = null;
+$spp_rows = [];          // siswa menunggak, urut terbesar
+$spp_sisa_kelas = 0.0;   // sisa tagihan TA ini (seluruh kelas)
+$spp_lain_kelas = 0.0;   // sisa tagihan TA sebelumnya
+$spp_jml_menunggak = 0;
+$spp_jml_lunas = 0;
+$spp_ada_tagihan = false;
+if ($id_kelas > 0 && $id_ta > 0 && $total_siswa > 0) {
+    $spp = spp_matriks_kelas($koneksi, $id_ta, $id_kelas);
+    $spp_ada_tagihan = ((float)$spp['total'] > 0);
+    foreach ($roster as $sw) {
+        $sid = (int)$sw['id_siswa'];
+        $sw_total = 0.0;
+        $sw_bayar = 0.0;
+        $sw_bulan = 0;
+        foreach (($spp['tagihan'][$sid] ?? []) as $tg) {
+            $t_total = (float)$tg['total'];
+            $t_bayar = (float)($spp['terbayar'][(int)$tg['id_tagihan']] ?? 0);
+            $sw_total += $t_total;
+            $sw_bayar += $t_bayar;
+            if ($t_total - $t_bayar > 0.005) $sw_bulan++;
+        }
+        $sw_sisa = max(0, $sw_total - $sw_bayar);
+        $ls = $spp['lain']['siswa'][$sid] ?? null;
+        $sw_lain = $ls ? (float)$ls['sisa'] : 0.0;
+        $sw_lain_n = $ls ? (int)$ls['n'] : 0;
+
+        $spp_sisa_kelas += $sw_sisa;
+        $spp_lain_kelas += $sw_lain;
+
+        if ($sw_sisa > 0.005 || $sw_lain > 0.005) {
+            $spp_rows[] = [
+                'id_siswa' => $sid,
+                'nama' => (string)$sw['nama'],
+                'nipd' => (string)($sw['nipd'] ?? ''),
+                'bulan' => $sw_bulan,
+                'total' => $sw_total,
+                'bayar' => $sw_bayar,
+                'sisa' => $sw_sisa,
+                'lain_sisa' => $sw_lain,
+                'lain_n' => $sw_lain_n,
+            ];
+        } elseif ($sw_total > 0) {
+            $spp_jml_lunas++;
+        }
+    }
+    usort($spp_rows, function ($a, $b) {
+        return ($b['sisa'] + $b['lain_sisa']) <=> ($a['sisa'] + $a['lain_sisa']);
+    });
+    $spp_jml_menunggak = count($spp_rows);
+}
+$spp_total = $spp_sisa_kelas + $spp_lain_kelas;
 
 // ---- Absensi sebulan (per tanggal & status) ----
 $abs_month = [];
@@ -546,6 +605,10 @@ if ($id_ta <= 0) {
     }
     if ($sesi_terjadwal_bulan > 0 && $pct_jurnal_bulan < 80) {
         $rekom[] = ['info', 'Realisasi jurnal mengajar baru <b>' . $pct_jurnal_bulan . '%</b> dari sesi terjadwal.'];
+    }
+    if ($spp_jml_menunggak > 0) {
+        $rekom[] = ['warning', '<b>' . $spp_jml_menunggak . ' siswa</b> masih memiliki tunggakan SPP total <b>'
+            . spp_rupiah($spp_total) . '</b> — koordinasikan dengan orang tua/wali.'];
     }
     if (empty($rekom)) {
         $rekom[] = ['success', 'Semua terpantau baik. Absensi &amp; jurnal bulan ini lengkap.'];
@@ -943,6 +1006,116 @@ $abs_label = ['H' => 'Hadir', 'S' => 'Sakit', 'I' => 'Izin', 'A' => 'Alpa'];
                             <div class="d-flex justify-content-between"><span>Realisasi jurnal</span><b><?= $pct_jurnal_bulan; ?>%</b></div>
                             <div class="d-flex justify-content-between"><span>Kehadiran bulan ini</span><b><?= $pct_kehadiran_bulan; ?>%</b></div>
                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3 mt-0">
+            <div class="col-12">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center gap-2">
+                        <span class="fw-semibold"><i class="bi bi-cash-coin me-1 text-success"></i> Tunggakan SPP Siswa</span>
+                        <span class="small fw-normal d-flex flex-wrap align-items-center gap-2">
+                            <?php if ($total_siswa === 0) : ?>
+                                <span class="badge bg-secondary-subtle text-secondary">Belum ada siswa</span>
+                            <?php elseif ($spp_total > 0.005) : ?>
+                                <span class="badge bg-danger-subtle text-danger"><i class="bi bi-wallet2 me-1"></i>Total <?= spp_rupiah($spp_total); ?></span>
+                                <span class="badge bg-warning text-dark"><i class="bi bi-person-exclamation me-1"></i><?= (int)$spp_jml_menunggak; ?> siswa menunggak</span>
+                                <?php if ($spp_lain_kelas > 0.005) : ?>
+                                    <span class="badge bg-warning text-dark" title="Tunggakan dari tahun ajaran sebelumnya">TA lalu <?= spp_rupiah($spp_lain_kelas); ?></span>
+                                <?php endif; ?>
+                            <?php elseif ($spp_ada_tagihan) : ?>
+                                <span class="badge bg-success-subtle text-success"><i class="bi bi-check2-circle me-1"></i>Semua siswa lunas</span>
+                            <?php else : ?>
+                                <span class="badge bg-secondary-subtle text-secondary">Tagihan belum digenerate</span>
+                            <?php endif; ?>
+                            <?php if (boleh_menu($level_user, 'spp_pembayaran')) : ?>
+                                <a href="index.php?menu=spp_pembayaran&ta=<?= (int)$id_ta; ?>&kelas=<?= (int)$id_kelas; ?>" class="text-decoration-none">Pembayaran SPP <i class="bi bi-box-arrow-up-right"></i></a>
+                            <?php elseif (boleh_menu($level_user, 'spp_rekap')) : ?>
+                                <a href="index.php?menu=spp_rekap&ta=<?= (int)$id_ta; ?>&kelas=<?= (int)$id_kelas; ?>" class="text-decoration-none">Rekap SPP <i class="bi bi-box-arrow-up-right"></i></a>
+                            <?php endif; ?>
+                        </span>
+                    </div>
+                    <div class="card-body p-0">
+                        <?php if ($total_siswa === 0) : ?>
+                            <div class="p-3 text-muted small"><i class="bi bi-inbox me-1"></i> Belum ada siswa pada kelas ini.</div>
+                        <?php elseif (!$spp_ada_tagihan && $spp_lain_kelas <= 0.005) : ?>
+                            <div class="p-3 text-muted small"><i class="bi bi-info-circle me-1"></i> Tagihan SPP untuk tahun ajaran <b><?= htmlspecialchars($nama_ta); ?></b> belum digenerate.</div>
+                        <?php elseif (empty($spp_rows)) : ?>
+                            <div class="p-3 text-success small"><i class="bi bi-check2-circle me-1"></i> Semua siswa sudah lunas SPP tahun ajaran ini<?= $spp_jml_lunas > 0 ? ' (' . (int)$spp_jml_lunas . ' siswa)' : ''; ?>.</div>
+                        <?php else : ?>
+                            <div class="table-responsive" style="max-height:340px;">
+                                <table class="table table-sm table-hover align-middle mb-0">
+                                    <thead class="table-light sticky-top">
+                                        <tr>
+                                            <th class="text-center" style="width:38px;">No</th>
+                                            <th>Nama Siswa</th>
+                                            <th class="text-nowrap">NIS</th>
+                                            <th class="text-center text-nowrap" title="Jumlah bulan belum lunas (TA ini)">Blm</th>
+                                            <th class="text-end text-nowrap">Tunggakan TA Ini</th>
+                                            <th class="text-end text-nowrap" title="Sisa tagihan dari tahun ajaran sebelumnya (kelas saat itu)">Tunggakan Lalu</th>
+                                            <th class="text-end text-nowrap">Total</th>
+                                            <?php if (boleh_menu($level_user, 'spp_pembayaran')) : ?><th class="text-center">Aksi</th><?php endif; ?>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($spp_rows as $i => $sr) : ?>
+                                            <tr>
+                                                <td class="text-center small text-muted"><?= $i + 1; ?></td>
+                                                <td class="small">
+                                                    <?php if (boleh_menu($level_user, 'siswa_detail')) : ?>
+                                                        <a href="index.php?menu=siswa_detail&id=<?= (int)$sr['id_siswa']; ?>" class="text-decoration-none"><?= htmlspecialchars($sr['nama']); ?></a>
+                                                    <?php else : ?>
+                                                        <?= htmlspecialchars($sr['nama']); ?>
+                                                    <?php endif; ?>
+                                                </td>
+                                                <td class="small text-muted text-nowrap"><?= htmlspecialchars($sr['nipd'] ?: '-'); ?></td>
+                                                <td class="text-center small">
+                                                    <?php if ($sr['bulan'] > 0) : ?>
+                                                        <span class="badge bg-danger"><?= (int)$sr['bulan']; ?></span>
+                                                    <?php else : ?>
+                                                        <span class="text-muted">&ndash;</span>
+                                                    <?php endif; ?>
+                                                </td>
+                                                <td class="text-end small <?= $sr['sisa'] > 0.005 ? 'text-danger' : 'text-muted'; ?>"><?= $sr['sisa'] > 0.005 ? spp_rupiah($sr['sisa']) : '&ndash;'; ?></td>
+                                                <td class="text-end small">
+                                                    <?php if ($sr['lain_sisa'] > 0.005) : ?>
+                                                        <span class="fw-semibold text-warning-emphasis"><?= spp_rupiah($sr['lain_sisa']); ?></span>
+                                                        <span class="badge bg-warning text-dark" title="Jumlah tagihan tahun ajaran sebelumnya"><?= (int)$sr['lain_n']; ?></span>
+                                                    <?php else : ?>
+                                                        <span class="text-muted">&ndash;</span>
+                                                    <?php endif; ?>
+                                                </td>
+                                                <td class="text-end small fw-bold"><?= spp_rupiah($sr['sisa'] + $sr['lain_sisa']); ?></td>
+                                                <?php if (boleh_menu($level_user, 'spp_pembayaran')) : ?>
+                                                    <td class="text-center">
+                                                        <a href="index.php?menu=spp_pembayaran&ta=<?= (int)$id_ta; ?>&siswa=<?= (int)$sr['id_siswa']; ?>" class="btn btn-sm btn-outline-success" title="Lihat / bayar tagihan">
+                                                            <i class="bi bi-cash-coin"></i>
+                                                        </a>
+                                                    </td>
+                                                <?php endif; ?>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                    <tfoot class="table-light fw-semibold">
+                                        <tr>
+                                            <td colspan="4" class="small">TOTAL (<?= (int)$spp_jml_menunggak; ?> siswa)</td>
+                                            <td class="text-end small text-danger"><?= spp_rupiah($spp_sisa_kelas); ?></td>
+                                            <td class="text-end small text-warning-emphasis"><?= spp_rupiah($spp_lain_kelas); ?></td>
+                                            <td class="text-end small"><?= spp_rupiah($spp_total); ?></td>
+                                            <?php if (boleh_menu($level_user, 'spp_pembayaran')) : ?><td></td><?php endif; ?>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                            <div class="small text-muted px-3 py-2">
+                                <i class="bi bi-info-circle me-1"></i>
+                                <b>Tunggakan TA Ini</b> = sisa tagihan SPP tahun ajaran <?= htmlspecialchars($nama_ta); ?>.
+                                <b>Tunggakan Lalu</b> = sisa tagihan dari tahun ajaran sebelumnya (kelas saat tagihan dibuat),
+                                tetap tampil walau siswa sudah naik kelas.
+                            </div>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>

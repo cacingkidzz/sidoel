@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/_init.php';
+require_once __DIR__ . '/../admin/helper_spp.php';
 wk_wajib_login();
 
 $profil = wk_profil($koneksi);
@@ -244,6 +245,56 @@ $perlu = array_slice($perlu, 0, 5);
 $jml_alpa3 = 0;
 foreach ($abs_siswa as $ab) { if ($ab['A'] >= 3) $jml_alpa3++; }
 
+// ---- Tunggakan SPP siswa (TA ini + TA sebelumnya) ----
+// Wali kelas dapat memantau tunggakan SPP kelasnya (read-only).
+$spp = $id_kelas > 0 ? spp_matriks_kelas($koneksi, $id_ta, $id_kelas) : null;
+$spp_rows = [];
+$spp_sisa = 0.0;
+$spp_lain = 0.0;
+$spp_lunas = 0;
+$spp_ada_tagihan = false;
+if ($spp) {
+    $spp_ada_tagihan = ((float)$spp['total'] > 0);
+    foreach ($roster as $sw) {
+        $sid = (int)$sw['id_siswa'];
+        $sw_total = 0.0;
+        $sw_bayar = 0.0;
+        $sw_bulan = 0;
+        foreach (($spp['tagihan'][$sid] ?? []) as $tg) {
+            $t_total = (float)$tg['total'];
+            $t_bayar = (float)($spp['terbayar'][(int)$tg['id_tagihan']] ?? 0);
+            $sw_total += $t_total;
+            $sw_bayar += $t_bayar;
+            if ($t_total - $t_bayar > 0.005) $sw_bulan++;
+        }
+        $sw_sisa = max(0, $sw_total - $sw_bayar);
+        $ls = $spp['lain']['siswa'][$sid] ?? null;
+        $sw_lain = $ls ? (float)$ls['sisa'] : 0.0;
+        $sw_lain_n = $ls ? (int)$ls['n'] : 0;
+
+        $spp_sisa += $sw_sisa;
+        $spp_lain += $sw_lain;
+
+        if ($sw_sisa > 0.005 || $sw_lain > 0.005) {
+            $spp_rows[] = [
+                'nama' => (string)$sw['nama'],
+                'nipd' => (string)($sw['nipd'] ?? ''),
+                'bulan' => $sw_bulan,
+                'sisa' => $sw_sisa,
+                'lain_sisa' => $sw_lain,
+                'lain_n' => $sw_lain_n,
+            ];
+        } elseif ($sw_total > 0) {
+            $spp_lunas++;
+        }
+    }
+    usort($spp_rows, function ($a, $b) {
+        return ($b['sisa'] + $b['lain_sisa']) <=> ($a['sisa'] + $a['lain_sisa']);
+    });
+}
+$spp_total = $spp_sisa + $spp_lain;
+$spp_menunggak = count($spp_rows);
+
 // ---- Rekomendasi ----
 $rekom = [];
 if ($hari_libur) {
@@ -263,6 +314,10 @@ if ($jml_alpa3 > 0) {
 }
 if ($jml_hari_efektif > 0 && $hari_terisi < $jml_hari_efektif) {
     $rekom[] = ['info', 'Absensi bulan ini <b>' . $hari_terisi . '/' . $jml_hari_efektif . '</b> hari efektif.'];
+}
+if ($spp_menunggak > 0) {
+    $rekom[] = ['warning', '<b>' . $spp_menunggak . ' siswa</b> masih menunggak SPP total <b>'
+        . spp_rupiah($spp_total) . '</b>.'];
 }
 if (empty($rekom)) {
     $rekom[] = ['success', 'Semua terpantau baik.'];
@@ -446,6 +501,62 @@ $abs_warna = ['H' => 'success', 'S' => 'info', 'I' => 'warning', 'A' => 'danger'
                     </table>
                 </div>
         <?php endif; endif; ?>
+    </div>
+</div>
+
+<div class="card wk-card mb-2">
+    <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center gap-2">
+        <span class="fw-semibold" style="font-size:.88rem;"><i class="bi bi-cash-coin text-success me-1"></i>Tunggakan SPP Siswa</span>
+        <?php if ($spp_total > 0.005): ?>
+            <span class="badge bg-danger" style="font-size:.68rem;"><?= spp_rupiah($spp_total); ?></span>
+        <?php elseif ($spp_ada_tagihan): ?>
+            <span class="badge bg-success" style="font-size:.68rem;">Lunas</span>
+        <?php endif; ?>
+    </div>
+    <div class="card-body p-0">
+        <?php if ($total_siswa === 0): ?>
+            <div class="p-3 text-muted small">Belum ada siswa pada kelas ini.</div>
+        <?php elseif (!$spp_ada_tagihan && $spp_lain <= 0.005): ?>
+            <div class="p-3 text-muted small">Tagihan SPP tahun ajaran <?= wk_esc($nama_ta); ?> belum digenerate.</div>
+        <?php elseif (empty($spp_rows)): ?>
+            <div class="p-3 text-success small"><i class="bi bi-check2-circle me-1"></i>Semua siswa lunas SPP tahun ajaran ini.</div>
+        <?php else: ?>
+            <div class="px-3 pt-2 small text-muted d-flex flex-wrap gap-2">
+                <span><b class="text-danger"><?= (int)$spp_menunggak; ?></b> siswa menunggak</span>
+                <?php if ($spp_lain > 0.005): ?><span>&middot; TA lalu <b><?= spp_rupiah($spp_lain); ?></b></span><?php endif; ?>
+                <?php if ($spp_lunas > 0): ?><span>&middot; <b class="text-success"><?= (int)$spp_lunas; ?></b> lunas</span><?php endif; ?>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="font-size:.7rem;">Nama</th>
+                            <th class="text-center" style="font-size:.7rem;" title="Jumlah bulan belum lunas (TA ini)">Blm</th>
+                            <th class="text-end" style="font-size:.7rem;">TA Ini</th>
+                            <th class="text-end" style="font-size:.7rem;" title="Tunggakan tahun ajaran sebelumnya">Lalu</th>
+                            <th class="text-end" style="font-size:.7rem;">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($spp_rows as $sr): ?>
+                            <tr>
+                                <td class="small">
+                                    <?= wk_esc($sr['nama']); ?>
+                                    <div class="text-muted" style="font-size:.68rem;"><?= wk_esc($sr['nipd'] ?: '-'); ?></div>
+                                </td>
+                                <td class="text-center small"><?= $sr['bulan'] > 0 ? '<span class="badge bg-danger">' . (int)$sr['bulan'] . '</span>' : '<span class="text-muted">&ndash;</span>'; ?></td>
+                                <td class="text-end small text-danger"><?= $sr['sisa'] > 0.005 ? spp_rupiah($sr['sisa'], '') : '&ndash;'; ?></td>
+                                <td class="text-end small text-warning-emphasis"><?= $sr['lain_sisa'] > 0.005 ? spp_rupiah($sr['lain_sisa'], '') : '&ndash;'; ?></td>
+                                <td class="text-end small fw-semibold"><?= spp_rupiah($sr['sisa'] + $sr['lain_sisa'], ''); ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+            <div class="small text-muted px-3 py-2" style="font-size:.7rem;">
+                <b>TA Ini</b> = sisa tagihan tahun ajaran <?= wk_esc($nama_ta); ?>. <b>Lalu</b> = sisa tagihan tahun ajaran sebelumnya (tetap tampil walau siswa sudah naik kelas).
+            </div>
+        <?php endif; ?>
     </div>
 </div>
 
