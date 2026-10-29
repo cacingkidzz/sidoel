@@ -42,7 +42,6 @@ jobs:
             **/backup/**
             **/foto_siswa/**
             **/foto_guru/**
-            **/cek_server.php
             **/phpinfo.php
             **/*.sql
             **/*.sql.gz

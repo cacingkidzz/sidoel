@@ -71,8 +71,9 @@ nbproject/
 node_modules/
 package-lock.json
 
-# --- Diagnosa sementara (jangan ikut deploy) ------------------------------
-cek_server.php
+# --- Diagnosa sementara ---------------------------------------------------
+# cek_server.php ikut di-commit (diminta) agar bisa dideploy via FTP.
+# HAPUS file itu dari repo & server setelah troubleshooting selesai.
 phpinfo.php
 info.php
 test.php
