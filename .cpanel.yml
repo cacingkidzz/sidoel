@@ -47,6 +47,9 @@ deployment:
     - /bin/cp -R walikelas $DEPLOYPATH
     - /bin/cp -f index.php $DEPLOYPATH/index.php
 
+    # Proteksi Apache (blokir .sql/.git/.md, tanpa directory listing)
+    - "[ -f .htaccess ] && /bin/cp -f .htaccess $DEPLOYPATH/.htaccess || true"
+
     # --- 4. Dependensi Composer (PhpSpreadsheet) ---------------------------
     # Dilewati otomatis bila Composer tidak tersedia (pakai vendor/ manual).
     - cd $DEPLOYPATH/admin && (command -v composer >/dev/null 2>&1 && composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader || echo "[SiDoel] composer tidak ditemukan - lewati (pastikan admin/vendor/ sudah ada)")

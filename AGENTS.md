@@ -419,6 +419,11 @@ Halaman lain (`detail_kelas.php`, `info_kelas.php`, `denah_siswa.php`, `rekap_ke
 - **`admin/koneksi.php`**: default lokal (localhost/root/`data_backup`) lalu **memuat `admin/koneksi.local.php` bila ada** (`is_file`) → file itu menimpa `$host/$user/$pass/$db` dan boleh `define('GOOGLE_MAPS_API_KEY', ...)`/`MYSQL_BIN_DIR`. Jadi deploy/`git pull` tidak pernah menimpa kredensial produksi. File lokal dibuat manual sekali di server (tidak di repo).
 - **`.cpanel.yml`**: deploy via cPanel → Git™ Version Control → *Deploy HEAD Commit*. Tugas: `mkdir` folder tujuan + folder writable (`admin/backup`, `img/foto_siswa`, `img/foto_guru`, `img/kop`, `img/logo`) → `cp -R` tiap folder aplikasi (`admin`, `guru`, `portal`, `sekretaris`, `siswa`, `walikelas`, `index.php`) → `composer install --no-dev` (dilewati bila Composer tak ada; unggah `admin/vendor/` manual) → `chmod u+rwX,g+rwX` folder writable. **`DEPLOYPATH` wajib diganti** (`/home/USER/public_html` atau `/home/USER/public_html/sidoel`). `cp` tidak menghapus file yang sudah dihapus dari repo → bersihkan manual bila perlu.
 - Karena DB & upload tidak di repo, data lama di server **aman** saat deploy ulang.
+- **`.htaccess` (3 file, ikut deploy):**
+  - **root `.htaccess`** — `Options -Indexes` (tanpa directory listing) + blokir `.sql/.sql.gz/.md/.yml/.yaml/.lock/.ini/.log/.bak/.zip/.rar/.7z`, `AGENTS.md`, `.gitignore`, `.cpanel.yml`, `.env*`, `composer.json/.lock`, dan folder `.git` (FilesMatch + RewriteRule, dengan guard `<IfModule>`).
+  - **`admin/.htaccess`** — blokir `admin/backup/` (dump DB) & `admin/vendor/` (Composer) dari akses web (`RewriteRule ^backup|^vendor`, fallback `RedirectMatch 404`), plus tanpa directory listing. PHP tetap bisa `require` vendor karena itu level filesystem.
+  - **`admin/assets/img/.htaccess`** — cegah eksekusi skrip terunggah (`.php/.phtml/.phar/.cgi/...` ditolak) di folder foto/kop/logo.
+  - Teruji via HTTP: `/AGENTS.md`, `/.gitignore`, `/.cpanel.yml`, `*.sql`, `admin/composer.lock`, `admin/backup/` (+ file dump), `admin/vendor/*` → **403**; `/`, `admin/login.php`, `siswa/login.php`, `admin/laporan/format_data_guru.xlsx`, gambar → **200**; file `.php` uji di folder foto → **403**.
 
 ---
 

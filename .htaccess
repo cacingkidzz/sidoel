@@ -1,0 +1,50 @@
+# ============================================================================
+# SiDoel — .htaccess root (Apache / cPanel)
+# Tujuan:
+#   1. Matikan directory listing.
+#   2. Blokir akses langsung ke file yang tidak boleh publik:
+#      dump SQL, dokumen internal (AGENTS.md), file git/composer, arsip, log.
+# Catatan: file ini TIDAK memblokir file .php, gambar, atau .xlsx template.
+# ============================================================================
+
+# --- 1. Tanpa directory listing ---------------------------------------------
+<IfModule mod_autoindex.c>
+    Options -Indexes
+</IfModule>
+
+# --- 2. Blokir file sensitif (berlaku juga di subfolder: admin/, siswa/, ...) -
+<FilesMatch "(?i)\.(sql|sql\.gz|md|markdown|yml|yaml|lock|ini|log|bak|orig|swp|zip|rar|7z)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+<FilesMatch "(?i)^(AGENTS\.md|\.gitignore|\.gitattributes|\.cpanel\.yml|\.env.*|composer\.(json|lock))$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+# --- 3. Blokir folder .git (bila repo di-clone langsung di public_html) ------
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Folder git & file dotfile
+    RewriteRule (^|/)\.git(/|$) - [F,L]
+    RewriteRule (^|/)\.(gitignore|gitattributes|cpanel\.yml)$ - [F,L,NC]
+    RewriteRule (^|/)\.env(\..*)?$ - [F,L,NC]
+
+    # Ekstensi berbahaya (lapisan kedua bila FilesMatch di atas dilewati)
+    RewriteRule \.(sql|sql\.gz|md|markdown|yml|yaml|lock|log|bak|orig|swp|zip|rar|7z)$ - [F,L,NC]
+</IfModule>
+
+# --- 4. Default halaman -----------------------------------------------------
+DirectoryIndex index.php index.html
