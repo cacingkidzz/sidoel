@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Koneksi database + konfigurasi aplikasi.
  *
@@ -22,12 +23,13 @@ $user   = "root";
 $pass   = "";
 $db     = "data_backup";
 
-// Override konfigurasi produksi (tidak ikut git).
-// require_once: file ini bisa ikut ter-include beberapa kali per request
-// (mis. index.php + konten/*.php), dan define() di dalamnya akan memicu
-// "Constant ... already defined" bila dimuat dua kali.
-if (is_file(__DIR__ . '/koneksi.local.php')) {
-    require_once __DIR__ . '/koneksi.local.php';
+// ============================================================================
+// PERBAIKAN: Memastikan jalur mengunci absolut ke direktori file ini berada
+// ============================================================================
+$local_config_file = __DIR__ . DIRECTORY_SEPARATOR . 'koneksi.local.php';
+
+if (is_file($local_config_file)) {
+    require_once $local_config_file;
 }
 
 // buat koneksi
@@ -54,8 +56,10 @@ if (!$koneksi) {
         http_response_code(503);
         header('Content-Type: text/html; charset=utf-8');
     }
-    $esc = static function ($v) { return htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8'); };
-    $ada_lokal = is_file(__DIR__ . '/koneksi.local.php');
+    $esc = static function ($v) {
+        return htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
+    };
+    $ada_lokal = is_file($local_config_file);
     echo '<!doctype html><html lang="id"><head><meta charset="utf-8">'
         . '<meta name="viewport" content="width=device-width,initial-scale=1">'
         . '<title>Koneksi Database Gagal — SiDoel</title>'
@@ -102,7 +106,7 @@ if (!defined('GOOGLE_MAPS_API_KEY')) {
 
 // Lokasi binary MySQL (untuk fitur Backup/Restore — Administrasi Sistem).
 // Windows/XAMPP: C:\xampp\mysql\bin. Linux/shared hosting: kosongkan ('') —
-// bila exec() dimatikan atau binary tidak ada, fitur otomatis memakai mode
+// bila exec() dimatikan or binary tidak ada, fitur otomatis memakai mode
 // PHP murni (lihat helper_backup.php).
 if (!defined('MYSQL_BIN_DIR')) {
     define('MYSQL_BIN_DIR', DIRECTORY_SEPARATOR === '\\' ? 'C:\\xampp\\mysql\\bin' : '');
@@ -111,5 +115,5 @@ if (!defined('MYSQL_BIN_DIR')) {
 // Helper autentikasi password (verifikasi MD5/bcrypt + auto-upgrade).
 require_once __DIR__ . '/helper_auth.php';
 
-// Tambahkan pesan ini jika ingin melihat notifikasi koneksi berhasil
-// echo "Koneksi berhasil";
+// Menampilkan notifikasi sukses koneksi dalam komentar HTML tersembunyi
+echo "<!-- Koneksi berhasil -->";
