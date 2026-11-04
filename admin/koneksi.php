@@ -51,5 +51,3 @@ if (is_file(__DIR__ . '/helper_auth.php')) {
     require_once __DIR__ . '/helper_auth.php';
 }
 
-// Notifikasi tersembunyi
-echo "<!-- Koneksi berhasil terpasang via Auto-Switching -->";
