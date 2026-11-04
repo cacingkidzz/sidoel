@@ -1,4 +1,4 @@
 deployment:
   tasks:
-    - export DEPLOYPATH=/home/ppdf2433/public_html/
+    - export DEPLOYPATH=/home/ppdf2433/public_html/sidoel.ppdb-app.my.id/
     - /bin/cp -R * $DEPLOYPATH
