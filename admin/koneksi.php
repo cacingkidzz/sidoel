@@ -51,7 +51,5 @@ if (is_file(__DIR__ . '/helper_auth.php')) {
     require_once __DIR__ . '/helper_auth.php';
 }
 
-// Notifikasi Sukses Tersembunyi (Bisa dilihat lewat View Source)
-echo "<!-- Koneksi Berhasil Terhubung Semenjak Auto-Switch Aktif -->";
 // Notifikasi tersembunyi
 echo "<!-- Koneksi berhasil terpasang via Auto-Switching -->";
