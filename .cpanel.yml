@@ -28,7 +28,7 @@
 deployment:
   tasks:
     # --- 1. Folder tujuan (WAJIB DIGANTI) -----------------------------------
-    - export DEPLOYPATH=/home/CPANELUSER/public_html/sidoel
+    - export DEPLOYPATH=/home/ppdf2433/public_html/sidoel.ppdb-app.my.id
 
     # --- 2. Siapkan folder tujuan + folder yang harus writable --------------
     - /bin/mkdir -p $DEPLOYPATH
