@@ -4,7 +4,9 @@
  * Koneksi database + konfigurasi aplikasi.
  * Menggunakan deteksi otomatis Host Lokal vs Hosting Produksi.
  */
-
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
 // 1. Atur Variabel Database Berdasarkan Environment (Hostname)
 if ($_SERVER['HTTP_HOST'] == 'localhost' || $_SERVER['HTTP_HOST'] == '127.0.0.1') {
     // --- KONFIGURASI LOKAL (XAMPP/LAPTOP) ---
