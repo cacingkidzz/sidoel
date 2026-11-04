@@ -2,43 +2,29 @@
 
 /**
  * Koneksi database + konfigurasi aplikasi.
- *
- * Nilai di bawah adalah DEFAULT untuk pengembangan lokal (XAMPP).
- *
- * PRODUCTION (cPanel): JANGAN ubah file ini. Buat file `admin/koneksi.local.php`
- * (sudah masuk .gitignore, jadi tidak akan ditimpa `git pull`/deploy) berisi:
- *
- *   <?php
- *   $host = 'localhost';
- *   $user = 'namauser_db';
- *   $pass = 'password_db';
- *   $db   = 'namauser_sidoel';
- *   define('GOOGLE_MAPS_API_KEY', 'KEY_KHUSUS_SERVER');
- *   define('MYSQL_BIN_DIR', '');
- *
- * File tersebut dimuat otomatis di bawah dan menimpa nilai default.
+ * Menggunakan deteksi otomatis Host Lokal vs Hosting Produksi.
  */
-$host   = "localhost";
-$user   = "root";
-$pass   = "";
-$db     = "data_backup";
 
-// ============================================================================
-// PERBAIKAN: Memastikan jalur mengunci absolut ke direktori file ini berada
-// ============================================================================
-$local_config_file = __DIR__ . DIRECTORY_SEPARATOR . 'koneksi.local.php';
-
-if (is_file($local_config_file)) {
-    require_once $local_config_file;
+// 1. Atur Variabel Database Berdasarkan Environment (Hostname)
+if ($_SERVER['HTTP_HOST'] == 'localhost' || $_SERVER['HTTP_HOST'] == '127.0.0.1') {
+    // --- KONFIGURASI LOKAL (XAMPP/LAPTOP) ---
+    $host   = "localhost";
+    $user   = "root";
+    $pass   = "";
+    $db     = "data_backup"; // Sesuaikan dengan nama DB di phpMyAdmin lokal Anda
+} else {
+    // --- KONFIGURASI PRODUCTION (HOSTING CPANEL) ---
+    $host   = "localhost";
+    $user   = "ppdf2433_sidoel";       // GANTI dengan User DB asli cPanel Anda
+    $pass   = "=!~^}N=kzr,Qot!D";     // GANTI dengan Password DB asli cPanel Anda
+    $db     = "ppdf2433_sidoel";       // GANTI dengan Nama DB asli cPanel Anda
 }
 
-// buat koneksi
-// PHP 8.1+ melempar mysqli_sql_exception saat koneksi gagal (bukan lagi
-// mengembalikan false). Tanpa penanganan, hosting hanya menampilkan
-// "HTTP ERROR 500" kosong sehingga sulit didiagnosis.
+// Matikan laporan error bawaan agar bisa ditangkap oleh try-catch khusus di bawah
 mysqli_report(MYSQLI_REPORT_OFF);
 $koneksi = null;
 $koneksi_error = '';
+
 try {
     $koneksi = @new mysqli($host, $user, $pass, $db);
     if ($koneksi->connect_errno) {
@@ -50,7 +36,7 @@ try {
     $koneksi = null;
 }
 
-// Tampilkan halaman diagnosa yang ramah (bukan 500 kosong) bila koneksi gagal.
+// Tampilkan halaman diagnosa yang ramah bila koneksi gagal.
 if (!$koneksi) {
     if (!headers_sent()) {
         http_response_code(503);
@@ -59,7 +45,6 @@ if (!$koneksi) {
     $esc = static function ($v) {
         return htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
     };
-    $ada_lokal = is_file($local_config_file);
     echo '<!doctype html><html lang="id"><head><meta charset="utf-8">'
         . '<meta name="viewport" content="width=device-width,initial-scale=1">'
         . '<title>Koneksi Database Gagal — SiDoel</title>'
@@ -73,47 +58,31 @@ if (!$koneksi) {
         . '.tag{display:inline-block;padding:1px 8px;border-radius:99px;font-size:12px;font-weight:600}'
         . '.ok{background:#dcfce7;color:#166534}.bad{background:#fee2e2;color:#991b1b}</style></head><body><div class="box">'
         . '<h1><i>⚠</i> Aplikasi tidak dapat terhubung ke database</h1>'
-        . '<p>SiDoel sudah terpasang, tetapi koneksi MySQL gagal sehingga semua halaman berhenti di sini '
-        . '(penyebab umum "HTTP ERROR 500" di hosting).</p>'
+        . '<p>SiDoel sudah terpasang, tetapi koneksi MySQL gagal sehingga semua halaman berhenti di sini.</p>'
         . '<p><strong>Pesan dari server:</strong></p><pre>' . $esc($koneksi_error) . '</pre>'
         . '<p><strong>Yang perlu diperiksa:</strong></p><ul>'
-        . '<li>Buat file <code>admin/koneksi.local.php</code> di server berisi kredensial database cPanel '
-        . '(<code>$host</code>, <code>$user</code>, <code>$pass</code>, <code>$db</code>).</li>'
-        . '<li>Pastikan user database sudah <em>Add User to Database</em> dengan <strong>ALL PRIVILEGES</strong>.</li>'
-        . '<li>Nama database di cPanel biasanya berawalan user, mis. <code>user_sidoel</code>.</li>'
-        . '<li>Pastikan dump database sudah diimpor lewat phpMyAdmin (41 tabel).</li>'
+        . '<li>Pastikan akun database di cPanel sudah sesuai.</li>'
+        . '<li>Pastikan user database sudah dikaitkan ke database dengan <strong>ALL PRIVILEGES</strong>.</li>'
         . '</ul>'
         . '<div class="meta">'
         . 'PHP <strong>' . $esc(PHP_VERSION) . '</strong> &middot; '
-        . 'ekstensi mysqli <span class="tag ' . (extension_loaded('mysqli') ? 'ok' : 'bad') . '">'
-        . (extension_loaded('mysqli') ? 'aktif' : 'TIDAK AKTIF') . '</span> &middot; '
-        . '<code>koneksi.local.php</code> <span class="tag ' . ($ada_lokal ? 'ok' : 'bad') . '">'
-        . ($ada_lokal ? 'ditemukan' : 'BELUM ADA') . '</span><br>'
         . 'Host <code>' . $esc($host) . '</code> &middot; User <code>' . $esc($user) . '</code> &middot; '
         . 'Database <code>' . $esc($db) . '</code>'
         . '</div></div></body></html>';
     exit;
 }
 
-// Konfigurasi aplikasi
-// Kunci Google Maps TIDAK disimpan di repo (agar tidak bocor saat repo dibagikan).
-// Isi di admin/koneksi.local.php (tidak ikut git):
-//   define('GOOGLE_MAPS_API_KEY', 'KEY_ANDA');
-// Bila kosong, aplikasi tetap jalan — hanya peta yang tidak tampil.
+// Konfigurasi aplikasi tambahan
 if (!defined('GOOGLE_MAPS_API_KEY')) {
-    define('GOOGLE_MAPS_API_KEY', '');
+    define('GOOGLE_MAPS_API_KEY', $_SERVER['HTTP_HOST'] == 'localhost' ? '' : 'KEY_HOSTING_ANDA');
 }
 
-// Lokasi binary MySQL (untuk fitur Backup/Restore — Administrasi Sistem).
-// Windows/XAMPP: C:\xampp\mysql\bin. Linux/shared hosting: kosongkan ('') —
-// bila exec() dimatikan or binary tidak ada, fitur otomatis memakai mode
-// PHP murni (lihat helper_backup.php).
 if (!defined('MYSQL_BIN_DIR')) {
     define('MYSQL_BIN_DIR', DIRECTORY_SEPARATOR === '\\' ? 'C:\\xampp\\mysql\\bin' : '');
 }
 
-// Helper autentikasi password (verifikasi MD5/bcrypt + auto-upgrade).
+// Helper autentikasi password
 require_once __DIR__ . '/helper_auth.php';
 
-// Menampilkan notifikasi sukses koneksi dalam komentar HTML tersembunyi
-echo "<!-- Koneksi berhasil -->";
+// Notifikasi tersembunyi
+echo "<!-- Koneksi berhasil terpasang via Auto-Switching -->";
