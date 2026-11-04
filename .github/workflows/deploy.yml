@@ -25,7 +25,7 @@ jobs:
           password: ${{ secrets.FTP_PASSWORD }}
           protocol: ftps
           port: 21
-          server-dir: ./public_html/sidoel.ppdb-app.my.id
+          server-dir: /public_html/sidoel.ppdb-app.my.id/
           timeout: 60000
           # Jangan hapus file di server yang tidak ada di repo (foto upload,
           # vendor, backup, koneksi.local.php) — kalau true, semua terhapus.
